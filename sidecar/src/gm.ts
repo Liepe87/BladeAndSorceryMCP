@@ -178,11 +178,8 @@ export class GameMaster {
     const position = [killPos[0], killPos[1] + 0.3, killPos[2]];
     void this.bridge.send("spawn_item", { itemId, position }).catch(() => undefined);
 
-    if (itemId === "Poo") {
-      this.announce("...that smell isn't the arena.", 4);
-    } else {
-      this.log(`[gm] loot drop: ${itemId}`);
-    }
+    // Silent feature - the drop happens without in-game commentary.
+    this.log(`[gm] loot drop: ${itemId}`);
   }
 
   private pickWeighted(items: { id: string; weight: number }[]): string | null {

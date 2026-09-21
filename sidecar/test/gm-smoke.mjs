@@ -85,7 +85,7 @@ await new Promise((r) => setTimeout(r, 800));
 const pooDrops = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "Poo");
 check("second kill also dropped loot", pooDrops.length >= 2);
 const pooMessages = commands.filter((c) => c.op === "show_message" && /smell/i.test(c.params.text ?? ""));
-check("poo drop announced", pooMessages.length >= 1);
+check("poo drop is a silent feature", pooMessages.length === 0);
 
 // Shop is a safe zone: low health must NOT trigger anything
 const commandsBeforeShop = commands.length;
