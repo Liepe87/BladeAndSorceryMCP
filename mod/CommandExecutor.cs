@@ -164,6 +164,30 @@ namespace BaSMcpBridge
             };
         }
 
+        private static Transform gmMessageAnchor;
+
+        // GM messages anchor to a child of the player's head placed well below
+        // eye level, so they read like subtitles instead of blocking the
+        // centre of the view during combat. (The game's Head anchor sits
+        // 1.25m directly in front of the face - unusable mid-fight.)
+        private static Transform GetMessageAnchor()
+        {
+            if (gmMessageAnchor != null)
+            {
+                return gmMessageAnchor; // Unity null-check also catches destroyed objects
+            }
+            if (Player.local == null || Player.local.head == null)
+            {
+                return null;
+            }
+            var go = new GameObject("BaSMcpMessageAnchor");
+            go.transform.SetParent(Player.local.head.transform, false);
+            // The Transform anchor renders the canvas 0.85m above this point.
+            go.transform.localPosition = new Vector3(0f, -1.15f, 2.6f);
+            gmMessageAnchor = go.transform;
+            return gmMessageAnchor;
+        }
+
         private static JObject ShowMessage(JObject p)
         {
             string text = (string)p?["text"];
@@ -180,11 +204,15 @@ namespace BaSMcpBridge
                 return new JObject { { "shown", false } };
             }
 
-            // Low priority (tutorials preempt), no warning sound, floats in
-            // front of the head, auto-dismisses.
+            Transform anchor = GetMessageAnchor();
+            MessageAnchorType anchorType = anchor != null
+                ? MessageAnchorType.Transform
+                : MessageAnchorType.Head;
+
+            // Low priority (tutorials preempt), no warning sound, auto-dismisses.
             var messageData = new DisplayMessage.MessageData(
                 text, 1, 0f, null, null, false, true, false, false,
-                MessageAnchorType.Head, null, true, duration, null, true, null);
+                anchorType, anchor, true, duration, null, true, null);
 
             display.ShowMessage(messageData);
             return new JObject { { "shown", true }, { "text", text } };
