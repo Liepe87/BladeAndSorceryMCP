@@ -2,7 +2,7 @@
     "Name":  "BaS MCP Bridge",
     "Description":  "Exposes game state and commands to an external MCP server over localhost TCP.",
     "Author":  "you",
-    "ModVersion":  "0.5.5",
+    "ModVersion":  "0.5.6",
     "GameVersion":  "1.0.0.0",
     "Thumbnail":  ""
 }

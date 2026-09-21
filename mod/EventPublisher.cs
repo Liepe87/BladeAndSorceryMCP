@@ -259,6 +259,7 @@ namespace BaSMcpBridge
 
         private static void OnCreatureSpawn(Creature creature)
         {
+            DetectShopkeeper(creature);
             Send("creature_spawn", new JObject
             {
                 { "instanceId", creature.GetInstanceID() },
@@ -266,6 +267,37 @@ namespace BaSMcpBridge
                 { "faction", creature.factionId },
                 { "pos", StatePublisher.Vec(creature.transform.position) }
             });
+        }
+
+        // A shopkeeper outside the shop level crashes the game (its brain
+        // dereferences a null shop). We don't yet know what is spawning it in
+        // the arena, so log its full origin whenever it appears.
+        private static void DetectShopkeeper(Creature creature)
+        {
+            if (creature == null)
+            {
+                return;
+            }
+            bool isShopkeeper = creature.creatureId == "Shopkeeper";
+            bool hasShopkeeperBrain = creature.brain != null
+                && creature.brain.instance != null
+                && creature.brain.instance.HasModule<BrainModuleShopkeeper>();
+            if (!isShopkeeper && !hasShopkeeperBrain)
+            {
+                return;
+            }
+            string spawner = "none";
+            if (creature.creatureSpawner != null)
+            {
+                spawner = creature.creatureSpawner.gameObject != null
+                    ? creature.creatureSpawner.gameObject.name
+                    : "destroyed";
+            }
+            Debug.Log("[BaSMcp] SHOPKEEPER DETECTED: creatureId=" + (creature.creatureId ?? "?")
+                + " brainId=" + (creature.data != null ? creature.data.brainId : "?")
+                + " fromWave=" + creature.IsFromWave()
+                + " spawner=" + spawner
+                + " pos=" + creature.transform.position);
         }
 
         private static void OnCreatureKill(Creature creature, Player player, CollisionInstance collisionInstance, EventTime eventTime)
@@ -335,6 +367,22 @@ namespace BaSMcpBridge
                 { "id", levelData != null ? levelData.id : null },
                 { "mode", mode != null ? mode.name : null }
             });
+
+            // Scan for a shopkeeper that was already present when the level
+            // loaded (spawned before our subscription ran).
+            try
+            {
+                foreach (Creature creature in Creature.allActive)
+                {
+                    if (creature != null)
+                    {
+                        DetectShopkeeper(creature);
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static void OnLevelUnload(LevelData levelData, LevelData.Mode mode, EventTime eventTime)
