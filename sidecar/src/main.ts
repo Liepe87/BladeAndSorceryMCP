@@ -16,6 +16,31 @@ import { LlmReactor, defaultLlmConfig } from "./gm-llm.js";
 const log = (msg: string): void =>
   console.error(`[bas-mcp] ${new Date().toISOString()} ${msg}`);
 
+// Load sidecar/.env if present (never overrides existing environment vars).
+function loadDotEnv(): void {
+  const envPath = join(dirname(fileURLToPath(import.meta.url)), "..", ".env");
+  try {
+    const content = readFileSync(envPath, "utf8");
+    let loaded = 0;
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (line === "" || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq === -1) continue;
+      const key = line.slice(0, eq).trim();
+      const value = line.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+        loaded++;
+      }
+    }
+    if (loaded > 0) log(`loaded ${loaded} variable(s) from .env`);
+  } catch {
+    // no .env file - fine
+  }
+}
+loadDotEnv();
+
 const tcpPort = Number(process.env.BASMCP_PORT ?? 47777);
 const httpPort = Number(process.env.BASMCP_HTTP_PORT ?? 47778);
 

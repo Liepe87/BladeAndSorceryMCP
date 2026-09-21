@@ -13,6 +13,9 @@ sidecar/node_modules/
 listener.log
 *.log
 
+# Secrets
+.env
+
 # OS cruft
 Thumbs.db
 .DS_Store
