@@ -37,6 +37,31 @@ namespace BaSMcpBridge
 
         private static void OnCreatureKill(Creature creature, Player player, CollisionInstance collisionInstance, EventTime eventTime)
         {
+            // The game fires this event twice per kill (OnStart + OnEnd); act once.
+            if (eventTime != EventTime.OnStart)
+            {
+                return;
+            }
+
+            // Make the corpse release its weapons immediately. The vanilla drop
+            // depends on the brain having a Death module and a random delay, so
+            // some deaths leave the weapon gripped forever. Force it.
+            try
+            {
+                if (creature.handLeft != null && creature.handLeft.grabbedHandle != null)
+                {
+                    creature.handLeft.UnGrab(false);
+                }
+                if (creature.handRight != null && creature.handRight.grabbedHandle != null)
+                {
+                    creature.handRight.UnGrab(false);
+                }
+            }
+            catch
+            {
+                // never let event handling break the kill
+            }
+
             bool killerIsPlayer = player != null;
             string killer = null;
 
@@ -79,6 +104,11 @@ namespace BaSMcpBridge
 
         private static void OnCreatureDespawn(Creature creature, EventTime eventTime)
         {
+            // fires twice per despawn attempt (OnStart + OnEnd); act once
+            if (eventTime != EventTime.OnStart)
+            {
+                return;
+            }
             Send("creature_despawn", new JObject
             {
                 { "instanceId", creature.GetInstanceID() },
@@ -88,6 +118,10 @@ namespace BaSMcpBridge
 
         private static void OnLevelLoad(LevelData levelData, LevelData.Mode mode, EventTime eventTime)
         {
+            if (eventTime != EventTime.OnStart)
+            {
+                return;
+            }
             Send("level_load", new JObject
             {
                 { "id", levelData != null ? levelData.id : null },
@@ -97,6 +131,10 @@ namespace BaSMcpBridge
 
         private static void OnLevelUnload(LevelData levelData, LevelData.Mode mode, EventTime eventTime)
         {
+            if (eventTime != EventTime.OnStart)
+            {
+                return;
+            }
             Send("level_unload", new JObject
             {
                 { "id", levelData != null ? levelData.id : null },
