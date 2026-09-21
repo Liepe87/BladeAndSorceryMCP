@@ -37,11 +37,42 @@ namespace BaSMcpBridge
 
         private static void OnCreatureKill(Creature creature, Player player, CollisionInstance collisionInstance, EventTime eventTime)
         {
+            bool killerIsPlayer = player != null;
+            string killer = null;
+
+            if (collisionInstance != null && collisionInstance.sourceColliderGroup != null)
+            {
+                CollisionHandler handler = collisionInstance.sourceColliderGroup.collisionHandler;
+                if (handler != null)
+                {
+                    Creature sourceCreature = null;
+                    if (handler.ragdollPart != null && handler.ragdollPart.ragdoll != null)
+                    {
+                        sourceCreature = handler.ragdollPart.ragdoll.creature;
+                    }
+
+                    if (sourceCreature != null && sourceCreature.isPlayer)
+                    {
+                        killerIsPlayer = true;
+                        killer = "player";
+                    }
+                    else if (sourceCreature != null)
+                    {
+                        killer = "creature:" + (sourceCreature.creatureId ?? "?");
+                    }
+                    else if (handler.item != null)
+                    {
+                        killer = "item:" + (handler.item.itemId ?? "?");
+                    }
+                }
+            }
+
             Send("creature_kill", new JObject
             {
                 { "instanceId", creature.GetInstanceID() },
                 { "type", creature.creatureId ?? "?" },
-                { "killerIsPlayer", player != null },
+                { "killer", killer ?? (killerIsPlayer ? "player" : "environment") },
+                { "killerIsPlayer", killerIsPlayer },
                 { "pos", StatePublisher.Vec(creature.transform.position) }
             });
         }
@@ -60,7 +91,7 @@ namespace BaSMcpBridge
             Send("level_load", new JObject
             {
                 { "id", levelData != null ? levelData.id : null },
-                { "mode", mode.ToString() }
+                { "mode", mode != null ? mode.name : null }
             });
         }
 
@@ -69,7 +100,7 @@ namespace BaSMcpBridge
             Send("level_unload", new JObject
             {
                 { "id", levelData != null ? levelData.id : null },
-                { "mode", mode.ToString() }
+                { "mode", mode != null ? mode.name : null }
             });
         }
 

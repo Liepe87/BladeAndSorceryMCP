@@ -22,7 +22,7 @@ namespace BaSMcpBridge
                 root["level"] = new JObject
                 {
                     { "id", level.data != null ? level.data.id : null },
-                    { "mode", level.mode.ToString() }
+                    { "mode", level.mode != null ? level.mode.name : null }
                 };
             }
 

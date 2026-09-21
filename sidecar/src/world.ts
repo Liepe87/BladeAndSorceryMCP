@@ -98,6 +98,14 @@ export class WorldModel {
     }
   }
 
+  aliveCount(): number {
+    let n = 0;
+    for (const c of this.creatures.values()) {
+      if (c.state === "Alive") n++;
+    }
+    return n;
+  }
+
   summary(): Record<string, unknown> {
     return {
       connected: this.connected,

@@ -15,7 +15,12 @@ function check(label, cond) {
 const transport = new StdioClientTransport({
   command: "node",
   args: ["dist/main.js"],
-  env: { ...process.env, BASMCP_PORT: String(PORT), BASMCP_HTTP_PORT: "47780" },
+  env: {
+    ...process.env,
+    BASMCP_PORT: String(PORT),
+    BASMCP_HTTP_PORT: "47780",
+    BASMCP_SPAWN_INTERVAL_MS: "0",
+  },
   stderr: "inherit",
 });
 const client = new Client({ name: "smoke", version: "0.0.1" });
@@ -50,6 +55,9 @@ socket.on("data", (c) => {
     if (typeof msg.op === "string") {
       if (msg.op === "ping") send({ type: "reply", id: msg.id, ok: true, result: { pong: true, gameTime: 123.4 } });
       else if (msg.op === "get_state") send({ type: "reply", id: msg.id, ok: true, result: { level: { id: "Arena" }, player: { present: true, health: 99 }, creatures: [] } });
+      else if (msg.op === "spawn_creature") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, creatureId: msg.params.creatureId, position: msg.params.position ?? [] } });
+      else if (msg.op === "spawn_item") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, itemId: msg.params.itemId } });
+      else if (msg.op === "despawn_entity") send({ type: "reply", id: msg.id, ok: true, result: { despawned: true, kind: "creature" } });
       else send({ type: "reply", id: msg.id, ok: false, error: "unknown op" });
     }
   }
@@ -60,7 +68,7 @@ await new Promise((r) => setTimeout(r, 1500));
 // --- MCP tool calls ---
 const tools = await client.listTools();
 console.log("\nTOOLS:", tools.tools.map((t) => t.name).join(", "));
-check("three tools exposed", tools.tools.length === 3);
+check("six tools exposed", tools.tools.length === 6);
 
 const state = await client.callTool({ name: "get_game_state", arguments: {} });
 const stateObj = JSON.parse(state.content[0].text);
@@ -76,6 +84,22 @@ check("list_creatures has 3 entries", creatureList.length === 3);
 const ping = await client.callTool({ name: "ping", arguments: {} });
 const pingObj = JSON.parse(ping.content[0].text);
 check("ping reaches fake game and gets pong", pingObj.pong === true && pingObj.gamePing?.pong === true);
+
+const spawnC = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "Creature_HumanMale", relativeToPlayer: [2, 0, 2] } });
+const spawnCObj = JSON.parse(spawnC.content[0].text);
+check("spawn_creature accepted", spawnCObj.ok === true && spawnCObj.result?.accepted === true);
+
+const spawnI = await client.callTool({ name: "spawn_item", arguments: { itemId: "Item_Weapon_SwordLongCommon" } });
+const spawnIObj = JSON.parse(spawnI.content[0].text);
+check("spawn_item accepted", spawnIObj.ok === true && spawnIObj.result?.accepted === true);
+
+const despawn = await client.callTool({ name: "despawn_entity", arguments: { instanceId: 101 } });
+const despawnObj = JSON.parse(despawn.content[0].text);
+check("despawn_entity accepted", despawnObj.ok === true && despawnObj.result?.despawned === true);
+
+const badSpawn = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "Creature_Dragon" } });
+const badSpawnObj = JSON.parse(badSpawn.content[0].text);
+check("allowlist rejects unknown creature", badSpawnObj.ok === false && /allowlist/.test(badSpawnObj.error ?? ""));
 
 socket.end();
 await client.close();

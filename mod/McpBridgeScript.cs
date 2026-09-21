@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
@@ -16,7 +16,7 @@ namespace BaSMcpBridge
 
         private const string Host = "127.0.0.1";
         private const int Port = 47777;
-        private const string ModVersion = "0.2.0";
+        private const string ModVersion = "0.3.0";
         private const string GameVersion = "1.3.1";
         private const int MaxCommandsPerFrame = 8;
         private const float SnapshotInterval = 0.5f;
@@ -227,3 +227,4 @@ namespace BaSMcpBridge
         }
     }
 }
+

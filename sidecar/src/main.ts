@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { TcpBridge } from "./tcp-bridge.js";
 import { createMcpServer } from "./mcp.js";
+import { loadAllowlist, SpawnLimiter } from "./guardrails.js";
 
 // Logs go to stderr so stdout stays clean for the MCP stdio transport.
 const log = (msg: string): void =>
@@ -15,8 +16,17 @@ const httpPort = Number(process.env.BASMCP_HTTP_PORT ?? 47778);
 const bridge = new TcpBridge(tcpPort, log);
 bridge.start();
 
+const guards = {
+  allowlist: loadAllowlist(),
+  limiter: new SpawnLimiter(
+    Number(process.env.BASMCP_SPAWN_PER_MIN ?? 30),
+    Number(process.env.BASMCP_SPAWN_INTERVAL_MS ?? 500),
+  ),
+  maxCreatures: Number(process.env.BASMCP_MAX_CREATURES ?? 20),
+};
+
 // stdio instance - for clients that spawn the sidecar themselves
-const stdioServer = createMcpServer(bridge);
+const stdioServer = createMcpServer(bridge, guards);
 await stdioServer.connect(new StdioServerTransport());
 
 // HTTP instances - for remote clients (opencode etc.) connecting to the
@@ -25,8 +35,8 @@ await stdioServer.connect(new StdioServerTransport());
 // so transports never overlap; GET SSE streams get their own instance so they
 // can stay open without blocking anything (we send no server-initiated
 // messages, but clients may still open a stream).
-const httpMcp = createMcpServer(bridge);
-const httpGetMcp = createMcpServer(bridge);
+const httpMcp = createMcpServer(bridge, guards);
+const httpGetMcp = createMcpServer(bridge, guards);
 
 // Convert a Node IncomingMessage to a Web Request.
 function toWebRequest(req: http.IncomingMessage): Request {
