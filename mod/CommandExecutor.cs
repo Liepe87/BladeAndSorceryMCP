@@ -319,13 +319,6 @@ namespace BaSMcpBridge
 
         private static JObject DespawnCreature(Creature creature)
         {
-            // Deliberately NO hard-destroy fallback. Destroy() bypasses the
-            // game's registry cleanup, leaving destroyed entries that corrupt
-            // every system which iterates Creature.all/allActive - including
-            // the wave system's "how many enemies remain" tracking, which is
-            // exactly what broke the arena's START button. If the normal
-            // despawn throws (broken void corpses), leave the corpse alone;
-            // the game's own cleaner keeps retrying harmlessly.
             try
             {
                 creature.Despawn(0f);
@@ -333,8 +326,26 @@ namespace BaSMcpBridge
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[BaSMcp] despawn failed (left for the game): " + e.Message);
-                return new JObject { { "despawned", false }, { "kind", "creature" } };
+                // Broken creature whose brain crashes on stop (e.g. a shopkeeper
+                // outside a shop level, or a void corpse). Hard-destroy it AND
+                // clean the registries - Destroy() bypasses the crashing
+                // Brain.Stop path entirely, and the explicit Remove keeps the
+                // game's own systems from iterating a destroyed entry.
+                Debug.LogWarning("[BaSMcp] despawn threw, force-destroying: " + e.Message);
+                try
+                {
+                    if (creature != null && creature.gameObject != null)
+                    {
+                        UnityEngine.Object.Destroy(creature.gameObject);
+                    }
+                    Creature.all.Remove(creature);
+                    Creature.allActive.Remove(creature);
+                    return new JObject { { "despawned", true }, { "kind", "creature" }, { "forced", true } };
+                }
+                catch (Exception e2)
+                {
+                    throw new Exception("creature despawn failed (normal and forced): " + e2.Message);
+                }
             }
         }
 

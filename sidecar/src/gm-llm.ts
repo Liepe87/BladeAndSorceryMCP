@@ -57,7 +57,7 @@ interface LlmAction {
   args: Record<string, unknown>;
 }
 
-const ALLOWED_CREATURES = ["Chicken", "HumanFemale", "HumanMale", "Shopkeeper"];
+const ALLOWED_CREATURES = ["Chicken", "HumanFemale", "HumanMale"];
 const ALLOWED_BRAINS = ["HumanDummy", "HumanEasy", "HumanMedium", "HumanHard", "HumanVIP"];
 const CURATED_ITEMS = [
   "PotionHealth", "SwordLongCommon", "SwordShortCommon", "SwordShortLarge",

@@ -141,7 +141,23 @@ export class GameMaster {
     this.killsAtLastWaveEnd = this.sessionKills;
 
     this.announce(`Wave cleared - ${this.sessionKills} kills this session.`, 6);
+    this.cleanupLingeringShopkeepers();
     void this.llm?.react("waveEnd");
+  }
+
+  // A Shopkeeper creature outside a shop level breaks the wave system: its
+  // brain dereferences a null shop reference every frame and crashes the
+  // START button when WaveSpawner.Clean() tries to despawn it. Remove any
+  // lingering shopkeepers once a wave settles so the next wave can start.
+  private cleanupLingeringShopkeepers(): void {
+    for (const c of this.bridge.world.creatures.values()) {
+      if (!c.isPlayer && c.type === "Shopkeeper") {
+        this.log(`[gm] removing lingering shopkeeper ${c.instanceId}`);
+        void this.bridge
+          .send("despawn_entity", { instanceId: c.instanceId })
+          .catch(() => undefined);
+      }
+    }
   }
 
   private onKill(killPos?: number[]): void {
