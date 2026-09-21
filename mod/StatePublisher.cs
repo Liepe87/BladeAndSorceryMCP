@@ -41,6 +41,10 @@ namespace BaSMcpBridge
             int count = 0;
             foreach (Creature creature in Creature.allActive)
             {
+                if (creature == null)
+                {
+                    continue; // destroyed creature left in the registry - skip
+                }
                 if (count >= MaxCreaturesInSnapshot)
                 {
                     break;

@@ -16,7 +16,7 @@ namespace BaSMcpBridge
 
         private const string Host = "127.0.0.1";
         private const int Port = 47777;
-        private const string ModVersion = "0.5.1";
+        private const string ModVersion = "0.5.2";
         private const string GameVersion = "1.3.1";
         private const int MaxCommandsPerFrame = 8;
         private const float SnapshotInterval = 0.5f;
@@ -227,6 +227,7 @@ namespace BaSMcpBridge
         }
     }
 }
+
 
 
 

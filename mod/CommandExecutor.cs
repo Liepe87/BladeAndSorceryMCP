@@ -52,6 +52,9 @@ namespace BaSMcpBridge
             {
                 ok = false;
                 error = e.Message;
+                // Full stack goes to the game log so live failures can be
+                // diagnosed without reproducing them here.
+                Debug.LogException(e);
             }
 
             return BuildReply(command.id, ok, result, error);
@@ -316,7 +319,11 @@ namespace BaSMcpBridge
         {
             // Corpses that fell through the world can enter a broken state
             // where the normal despawn path throws (that's why the game keeps
-            // retrying them forever). Fall back to a hard destroy.
+            // retrying them forever). Fall back to a hard destroy - but also
+            // remove the creature from the registries, because Destroy()
+            // bypasses the game's own cleanup and a destroyed creature left in
+            // Creature.all/allActive breaks every system that iterates them
+            // (snapshots, hit events, spawns).
             try
             {
                 creature.Despawn(0f);
@@ -326,6 +333,8 @@ namespace BaSMcpBridge
                 try
                 {
                     UnityEngine.Object.Destroy(creature.gameObject);
+                    Creature.all.Remove(creature);
+                    Creature.allActive.Remove(creature);
                     return new JObject { { "despawned", true }, { "kind", "creature" }, { "forced", true } };
                 }
                 catch (Exception e2)
@@ -364,6 +373,10 @@ namespace BaSMcpBridge
             var arr = new JArray();
             foreach (Creature creature in Creature.allActive)
             {
+                if (creature == null)
+                {
+                    continue; // destroyed creature left in the registry - skip
+                }
                 arr.Add(StatePublisher.Describe(creature));
             }
             obj["creatures"] = arr;
