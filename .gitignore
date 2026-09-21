@@ -1,0 +1,18 @@
+# Decompiled game source - proprietary, never commit
+decompiled/
+
+# Build output
+mod/bin/
+mod/obj/
+sidecar/dist/
+
+# Node dependencies
+sidecar/node_modules/
+
+# Runtime logs
+listener.log
+*.log
+
+# OS cruft
+Thumbs.db
+.DS_Store
