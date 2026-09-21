@@ -99,5 +99,23 @@ reactor = new LlmReactor(
 await reactor.react("waveEnd");
 check("API error handled without crashing", commands.length === 0);
 
+// 7: quiet level (Shop) never calls the LLM at all
+let fetchCalls = 0;
+const quietWorld = {
+  aliveCount: () => 0,
+  recentEvents: () => [],
+  summary: () => ({ level: { id: "Shop" }, creatures: [] }),
+};
+const quietConfig = { ...config, levelRules: { Shop: { quiet: true } } };
+const quietReactor = new LlmReactor(
+  fakeChannel, quietWorld, guards, quietConfig, "test-key", fakeLog,
+  async () => {
+    fetchCalls += 1;
+    return { ok: true, json: async () => ({ choices: [{ message: { content: '{"comment":"x","actions":[]}' } }] }) };
+  },
+);
+await quietReactor.react("waveEnd");
+check("quiet level never calls the LLM", fetchCalls === 0);
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

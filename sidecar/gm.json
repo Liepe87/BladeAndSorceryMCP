@@ -10,12 +10,36 @@
     "items": ["PotionHealth", "SwordLongCommon", "AxeShortWar", "ThrowablesDagger"]
   },
   "killStreakLog": { "enabled": true, "kills": 3, "windowMs": 10000 },
+  "levelRules": {
+    "Arena": {
+      "spawnPoints": [
+        [-11.76, 0.09, -10.59],
+        [8.84, 0.18, 10.58],
+        [2.52, 0.07, -17.11],
+        [-5.28, 0.21, 16.85]
+      ],
+      "llmGuidance": "Enemies enter through the arena entrances. Spawn them ONLY at the listed spawn points, never within 8 metres of the player. Do not react to simply entering an empty arena - only react after an actual fight."
+    },
+    "Home": {
+      "burglar": { "enabled": true, "minIntervalMs": 900000, "maxEnemies": 2 },
+      "spawnPoints": [
+        [37.7, 1.87, -46.4],
+        [40.5, 1.87, -46.4],
+        [35.5, 1.87, -43.0]
+      ],
+      "llmGuidance": "The player's home. Occasionally 1-2 burglars sneak in through the entrances. Keep it rare and roleplay them as burglars in your comment."
+    },
+    "Shop": {
+      "quiet": true,
+      "llmGuidance": "SAFE ZONE. Never take any action here."
+    }
+  },
   "llm": {
     "enabled": true,
     "baseUrl": "https://openrouter.ai/api/v1",
     "model": "deepseek/deepseek-chat",
-    "minIntervalMs": 60000,
-    "triggers": ["waveEnd", "killStreak", "lowHealth"],
+    "minIntervalMs": 180000,
+    "triggers": ["waveEnd", "killStreak", "lowHealth", "burglar"],
     "timeoutMs": 30000,
     "maxActions": 3
   }

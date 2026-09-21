@@ -111,7 +111,8 @@ if (process.env.BASMCP_GM !== "0") {
       if (!apiKey) {
         log("GM LLM enabled in config but OPENROUTER_API_KEY is not set - LLM disabled");
       } else {
-        llmReactor = new LlmReactor(bridge, bridge.world, guards, gmConfig.llm, apiKey, log);
+        const llmConfig = { ...gmConfig.llm, levelRules: gmConfig.levelRules };
+        llmReactor = new LlmReactor(bridge, bridge.world, guards, llmConfig, apiKey, log);
         log(`game master LLM enabled (${gmConfig.llm.model})`);
       }
     }

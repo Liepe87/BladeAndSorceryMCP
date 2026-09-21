@@ -1,6 +1,6 @@
 import type { TcpBridge } from "./tcp-bridge.js";
 import type { LlmReactor } from "./gm-llm.js";
-import type { LlmConfig } from "./gm-llm.js";
+import type { LlmConfig, LevelRule } from "./gm-llm.js";
 
 export interface GmConfig {
   enabled: boolean;
@@ -14,6 +14,7 @@ export interface GmConfig {
     items: string[];
   };
   killStreakLog: { enabled: boolean; kills: number; windowMs: number };
+  levelRules?: Record<string, LevelRule>;
   llm?: LlmConfig;
 }
 
@@ -55,6 +56,9 @@ export class GameMaster {
   private waveSettled = false;
   private voidCorpses = new Map<number, number>(); // instanceId -> y
   private lastCleanupAt = 0;
+  private currentLevel: string | null = null;
+  private killsAtLastWaveEnd = 0;
+  private lastBurglarAt = 0;
 
   constructor(
     private bridge: TcpBridge,
@@ -74,11 +78,21 @@ export class GameMaster {
   }
 
   private onSnapshot(msg: Record<string, unknown>): void {
+    const level = msg.level as { id?: string | null } | undefined;
+    if (level?.id) this.currentLevel = level.id;
+
     const creatures = (msg.creatures as SnapshotCreature[] | undefined) ?? [];
     this.enemiesAlive = creatures.filter((c) => !c.isPlayer && c.state === "Alive").length;
 
     const player = msg.player as { health?: number } | undefined;
     if (player?.health !== undefined) this.playerHealth = player.health;
+
+    const rule = this.levelRule();
+    if (rule?.quiet) {
+      // Safe zone: keep counters fresh but do nothing.
+      this.lastEnemiesAlive = this.enemiesAlive;
+      return;
+    }
 
     // Track void-falling corpses (dead + far below the floor) for cleanup.
     if (this.config.cleanupVoidCorpses) {
@@ -122,6 +136,12 @@ export class GameMaster {
   }
 
   private onWaveEnd(): void {
+    // Home has no waves - it gets burglars instead.
+    if (this.currentLevel === "Home") return;
+    // Only react to a wave that actually had kills since the last reaction.
+    if (this.sessionKills <= this.killsAtLastWaveEnd) return;
+    this.killsAtLastWaveEnd = this.sessionKills;
+
     this.log(
       `[gm] wave settled - session kills: ${this.sessionKills}, player health: ${Math.round(this.playerHealth)}`,
     );
@@ -140,6 +160,7 @@ export class GameMaster {
 
   private onKill(): void {
     this.sessionKills += 1;
+    if (this.levelRule()?.quiet) return;
     const streak = this.config.killStreakLog;
     if (!streak.enabled) return;
 
@@ -157,6 +178,15 @@ export class GameMaster {
     if (!this.config.enabled) return;
 
     const now = Date.now();
+    const rule = this.levelRule();
+    if (rule?.quiet) return;
+
+    // Home: occasional burglars sneaking in through the entrances.
+    const burglar = rule?.burglar;
+    if (this.currentLevel === "Home" && burglar?.enabled && now - this.lastBurglarAt > burglar.minIntervalMs) {
+      this.lastBurglarAt = now;
+      this.spawnBurglars(burglar.maxEnemies, rule?.spawnPoints);
+    }
 
     // Wave settle: enemies must stay at zero for a settle window (the game
     // sometimes feeds stragglers several seconds after the last kill).
@@ -183,6 +213,31 @@ export class GameMaster {
         })
         .catch(() => undefined);
     }
+  }
+
+  private levelRule(): LevelRule | undefined {
+    if (!this.currentLevel) return undefined;
+    return this.config.levelRules?.[this.currentLevel];
+  }
+
+  private spawnBurglars(maxEnemies: number, spawnPoints?: number[][]): void {
+    if (!spawnPoints || spawnPoints.length === 0) return;
+    const count = 1 + Math.floor(Math.random() * Math.max(1, maxEnemies));
+    const brains = ["HumanEasy", "HumanMedium"];
+    const types = ["HumanMale", "HumanFemale"];
+
+    this.log(`[gm] ${count} burglar(s) sneaking into the home...`);
+    for (let i = 0; i < count; i++) {
+      const point = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+      const params = {
+        creatureId: types[Math.floor(Math.random() * types.length)],
+        brainId: brains[Math.floor(Math.random() * brains.length)],
+        factionId: 3,
+        position: point,
+      };
+      void this.bridge.send("spawn_creature", params).catch(() => undefined);
+    }
+    void this.llm?.react("burglar");
   }
 
   private gate(key: string, cooldownMs: number, action: () => void): void {

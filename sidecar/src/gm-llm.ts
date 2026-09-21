@@ -1,6 +1,13 @@
 import { loadAllowlist } from "./guardrails.js";
 import type { SpawnLimiter } from "./guardrails.js";
 
+export interface LevelRule {
+  quiet?: boolean;
+  spawnPoints?: number[][];
+  llmGuidance?: string;
+  burglar?: { enabled: boolean; minIntervalMs: number; maxEnemies: number };
+}
+
 export interface LlmConfig {
   enabled: boolean;
   baseUrl: string;
@@ -9,6 +16,7 @@ export interface LlmConfig {
   triggers: string[];
   timeoutMs: number;
   maxActions: number;
+  levelRules?: Record<string, LevelRule>;
 }
 
 export const defaultLlmConfig: LlmConfig = {
@@ -50,28 +58,44 @@ const CURATED_ITEMS = [
   "ShieldRound", "BowCommon", "Arrow",
 ];
 
-function buildSystemPrompt(world: LlmWorld): string {
+function buildSystemPrompt(world: LlmWorld, config: LlmConfig): string {
   const state = world.summary();
-  return [
+  const level = ((state.level as { id?: string } | undefined)?.id) ?? "unknown";
+  const rule = config.levelRules?.[level];
+
+  const lines = [
     "You are the AI game master of a live Blade & Sorcery VR session.",
     "You watch combat events and react with small, immediate changes that make the fight more fun.",
     "Respond with ONLY a JSON object, no markdown, no commentary outside the JSON:",
     '{"comment": "one short in-character dungeon-master sentence", "actions": [{"tool": "...", "args": {...}}]}',
     "",
     "Allowed tools and arguments:",
-    `- spawn_creature: {"creatureId": one of ${JSON.stringify(ALLOWED_CREATURES)}, "relativeToPlayer": [dx,dy,dz], "brainId": one of ${JSON.stringify(ALLOWED_BRAINS)}, "factionId": 3 for enemy}`,
+    `- spawn_creature: {"creatureId": one of ${JSON.stringify(ALLOWED_CREATURES)}, "relativeToPlayer": [dx,dy,dz] OR "position": [x,y,z], "brainId": one of ${JSON.stringify(ALLOWED_BRAINS)}, "factionId": 3 for enemy}`,
     `- spawn_item: {"itemId": one of ${JSON.stringify(CURATED_ITEMS)}, "relativeToPlayer": [dx,dy,dz], "owned": true|false}`,
     "- despawn_entity: {\"instanceId\": number}",
     "",
     "Rules:",
-    "- At most 3 actions. Spawn enemies 2-6 metres from the player, at most 3 new enemies per reaction.",
+    "- At most 3 actions. At most 3 new enemies per reaction.",
     "- NEVER despawn the player. The player's instanceId is in the state below.",
     "- If the player is hurt, help. If the player is crushing everything, escalate gently.",
-    "- Prefer player-relative positions; never spawn things on top of the player (dy >= 0.2, horizontal distance >= 1).",
+    "- Never spawn anything within 5 metres of the player. Prefer known spawn points or map edges so enemies approach naturally.",
     "- If nothing is worth doing, return an empty actions array.",
     "",
-    `Current state: ${JSON.stringify(state)}`,
-  ].join("\n");
+    `Current level: ${level}`,
+  ];
+
+  if (rule?.quiet) {
+    lines.push("Level-specific instructions: SAFE ZONE. You MUST return an empty actions array.");
+  }
+  if (rule?.llmGuidance) {
+    lines.push(`Level-specific instructions: ${rule.llmGuidance}`);
+  }
+  if (rule?.spawnPoints && rule.spawnPoints.length > 0) {
+    lines.push(`Known spawn points (absolute coordinates, prefer these): ${JSON.stringify(rule.spawnPoints)}`);
+  }
+
+  lines.push("", `Current state: ${JSON.stringify(state)}`);
+  return lines.join("\n");
 }
 
 // The model sometimes wraps JSON in code fences or adds prose. Extract the
@@ -104,6 +128,12 @@ export class LlmReactor {
   async react(trigger: string): Promise<void> {
     if (!this.config.enabled) return;
     if (!this.config.triggers.includes(trigger)) return;
+
+    // Never act in quiet zones (e.g. the shop).
+    const summary = this.world.summary();
+    const level = ((summary.level as { id?: string } | undefined)?.id) ?? "unknown";
+    if (this.config.levelRules?.[level]?.quiet) return;
+
     const now = Date.now();
     if (now - this.lastCall < this.config.minIntervalMs) return;
     this.lastCall = now; // reserve the slot even if the call fails
@@ -112,7 +142,7 @@ export class LlmReactor {
     const body = {
       model: this.config.model,
       messages: [
-        { role: "system", content: buildSystemPrompt(this.world) },
+        { role: "system", content: buildSystemPrompt(this.world, this.config) },
         { role: "user", content: userMessage },
       ],
     };

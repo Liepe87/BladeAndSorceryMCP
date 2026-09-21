@@ -93,6 +93,33 @@ await new Promise((r) => setTimeout(r, 2500));
 const totalPotions = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth");
 check("wave end reward spawned (second potion)", totalPotions.length >= 2);
 
+// Shop is a safe zone: low health must NOT trigger anything
+const commandsBeforeShop = commands.length;
+send({
+  type: "snapshot", seq: 4, gameTime: 4,
+  level: { id: "Shop", mode: "Sandbox" },
+  player: { present: true, pos: [0, 0, 0], health: 40 },
+  creatures: [{ instanceId: 1, type: "HumanMale", state: "Alive", health: 40, faction: 2, isPlayer: true, pos: [0, 0, 0], dist: 0 }],
+});
+await new Promise((r) => setTimeout(r, 1500));
+const shopActions = commands.slice(commandsBeforeShop).filter((c) => c.op === "spawn_item");
+check("shop safe zone: no potion spawned", shopActions.length === 0);
+
+// Home: burglars sneak in at the entrance points after the cooldown
+const commandsBeforeHome = commands.length;
+send({
+  type: "snapshot", seq: 5, gameTime: 5,
+  level: { id: "Home", mode: "Sandbox" },
+  player: { present: true, pos: [37.7, 1.87, -46.4], health: 100 },
+  creatures: [{ instanceId: 1, type: "HumanMale", state: "Alive", health: 100, faction: 2, isPlayer: true, pos: [37.7, 1.87, -46.4], dist: 0 }],
+});
+await new Promise((r) => setTimeout(r, 2500));
+const burglarSpawns = commands.slice(commandsBeforeHome).filter((c) => c.op === "spawn_creature");
+check(
+  "home burglars spawned at entrance points",
+  burglarSpawns.length >= 1 && burglarSpawns.every((c) => Array.isArray(c.params.position)),
+);
+
 socket.end();
 child.kill();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

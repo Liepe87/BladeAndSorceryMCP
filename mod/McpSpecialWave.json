@@ -1,0 +1,83 @@
+{
+  "$type": "ThunderRoad.WaveData, ThunderRoad",
+  "id": "McpSpecialWave",
+  "sensitiveContent": "None",
+  "sensitiveFilterBehaviour": "Discard",
+  "version": 2,
+  "groupPath": "Sandbox",
+  "category": "7BaS MCP",
+  "localizationId": "-",
+  "title": "MCP Special Assault",
+  "description": "A custom wave composed by the BaS MCP bridge: mixed soldiers with a hard veteran.",
+  "loopBehavior": "NoLoop",
+  "totalMaxAlive": 5,
+  "alwaysAvailable": true,
+  "waveSelectors": [],
+  "factions": [
+    {
+      "$type": "ThunderRoad.WaveData+WaveFaction, ThunderRoad",
+      "factionID": 4,
+      "factionMaxAlive": 8
+    }
+  ],
+  "groups": [
+    {
+      "$type": "ThunderRoad.WaveData+Group, ThunderRoad",
+      "mergeKey": "",
+      "reference": "Table",
+      "referenceID": "SoldierAlertMelee",
+      "overrideFaction": false,
+      "factionID": 0,
+      "overrideContainer": false,
+      "overrideContainerID": null,
+      "overrideBrain": false,
+      "overrideBrainID": null,
+      "overrideMaxMelee": false,
+      "overrideMaxMeleeCount": 0,
+      "groupHealthMultiplier": 1.0,
+      "minMaxCount": { "x": 3, "y": 3 },
+      "spawnPointIndex": -1,
+      "prereqGroupIndex": -1,
+      "prereqMaxRemainingAlive": 0
+    },
+    {
+      "$type": "ThunderRoad.WaveData+Group, ThunderRoad",
+      "mergeKey": "",
+      "reference": "Table",
+      "referenceID": "SoldierAlertMix",
+      "overrideFaction": false,
+      "factionID": 0,
+      "overrideContainer": false,
+      "overrideContainerID": null,
+      "overrideBrain": true,
+      "overrideBrainID": "HumanHard",
+      "overrideMaxMelee": false,
+      "overrideMaxMeleeCount": 0,
+      "groupHealthMultiplier": 1.0,
+      "minMaxCount": { "x": 1, "y": 1 },
+      "spawnPointIndex": -1,
+      "prereqGroupIndex": -1,
+      "prereqMaxRemainingAlive": 0
+    },
+    {
+      "$type": "ThunderRoad.WaveData+Group, ThunderRoad",
+      "mergeKey": "",
+      "reference": "Table",
+      "referenceID": "SoldierAlertRanged",
+      "overrideFaction": false,
+      "factionID": 0,
+      "overrideContainer": false,
+      "overrideContainerID": null,
+      "overrideBrain": false,
+      "overrideBrainID": null,
+      "overrideMaxMelee": false,
+      "overrideMaxMeleeCount": 0,
+      "groupHealthMultiplier": 1.0,
+      "minMaxCount": { "x": 1, "y": 1 },
+      "spawnPointIndex": -1,
+      "prereqGroupIndex": -1,
+      "prereqMaxRemainingAlive": 0
+    }
+  ],
+  "modules": []
+}
