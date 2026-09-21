@@ -28,13 +28,39 @@ export class WorldModel {
   creatures = new Map<number, CreatureState>();
   lastSnapshotAt = 0;
   lastSeq = -1;
+  stats = {
+    spells: {} as Record<string, number>,
+    hitsDealt: 0,
+    hitsTaken: 0,
+    parries: 0,
+    parried: 0,
+    disarms: 0,
+    disarmed: 0,
+    liquids: 0,
+    edibles: 0,
+  };
   private eventLog: { t: number; name: string; data: unknown }[] = [];
+
+  private resetStats(): void {
+    this.stats = {
+      spells: {},
+      hitsDealt: 0,
+      hitsTaken: 0,
+      parries: 0,
+      parried: 0,
+      disarms: 0,
+      disarmed: 0,
+      liquids: 0,
+      edibles: 0,
+    };
+  }
 
   apply(msg: Record<string, unknown>): void {
     switch (msg.type) {
       case "hello":
         this.connected = true;
         this.gameVersion = typeof msg.gameVersion === "string" ? msg.gameVersion : undefined;
+        this.resetStats();
         break;
 
       case "snapshot": {
@@ -95,6 +121,30 @@ export class WorldModel {
         this.level = null;
         this.creatures.clear();
         break;
+
+      case "spell_cast":
+        if (data.isPlayer === true && typeof data.spellId === "string") {
+          this.stats.spells[data.spellId] = (this.stats.spells[data.spellId] ?? 0) + 1;
+        }
+        break;
+      case "hit":
+        if (data.isPlayer === true) this.stats.hitsTaken++;
+        if (data.sourceIsPlayer === true) this.stats.hitsDealt++;
+        break;
+      case "parry":
+        if (data.parryingIsPlayer === true) this.stats.parries++;
+        if (data.parriedIsPlayer === true) this.stats.parried++;
+        break;
+      case "disarm":
+        if (data.isPlayer === true) this.stats.disarmed++;
+        else this.stats.disarms++;
+        break;
+      case "liquid_consumed":
+        if (data.isPlayer === true) this.stats.liquids++;
+        break;
+      case "edible_consumed":
+        if (data.isPlayer === true) this.stats.edibles++;
+        break;
     }
   }
 
@@ -118,6 +168,7 @@ export class WorldModel {
       player: this.player,
       creatureCount: this.creatures.size,
       creatures: [...this.creatures.values()],
+      stats: this.stats,
       lastSnapshotAgeMs: this.lastSnapshotAt ? Date.now() - this.lastSnapshotAt : null,
       lastSeq: this.lastSeq,
       recentEvents: this.eventLog.slice(-20),

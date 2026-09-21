@@ -47,6 +47,18 @@ send({
 });
 send({ type: "event", name: "creature_spawn", data: { instanceId: 103, type: "HumanMale", faction: 0, pos: [0, 0, 5] } });
 
+// perception events
+send({ type: "event", name: "spell_cast", data: { spellId: "Fire", isPlayer: true } });
+send({ type: "event", name: "spell_cast", data: { spellId: "Lightning", isPlayer: true } });
+send({ type: "event", name: "spell_cast", data: { spellId: "Fire", isPlayer: true } });
+send({ type: "event", name: "hit", data: { instanceId: 102, type: "HumanFemale", isPlayer: false, damage: 25, damageType: "Slash", source: "player", sourceIsPlayer: true } });
+send({ type: "event", name: "hit", data: { instanceId: 1, type: "HumanMale", isPlayer: true, damage: 8, damageType: "Blunt", source: "creature:HumanMale", sourceIsPlayer: false } });
+send({ type: "event", name: "parry", data: { parryingIsPlayer: true, parriedIsPlayer: false } });
+send({ type: "event", name: "parry", data: { parryingIsPlayer: false, parriedIsPlayer: true } });
+send({ type: "event", name: "disarm", data: { instanceId: 102, isPlayer: false } });
+send({ type: "event", name: "liquid_consumed", data: { itemId: "PotionHealth", isPlayer: true } });
+send({ type: "event", name: "edible_consumed", data: { itemId: "FoodApple", isPlayer: true } });
+
 let buffer = "";
 socket.on("data", (c) => {
   buffer += c.toString();
@@ -81,6 +93,13 @@ check("world sees game connected", stateObj.connected === true);
 check("world sees level Arena", stateObj.level?.id === "Arena");
 check("world has 3 creatures (2 snapshot + 1 event)", stateObj.creatureCount === 3);
 check("player health 100", stateObj.player?.health === 100);
+
+const stats = stateObj.stats ?? {};
+check("spell counts tracked", stats.spells?.Fire === 2 && stats.spells?.Lightning === 1);
+check("hits dealt/taken tracked", stats.hitsDealt === 1 && stats.hitsTaken === 1);
+check("parries tracked both ways", stats.parries === 1 && stats.parried === 1);
+check("disarms tracked", stats.disarms === 1 && stats.disarmed === 0);
+check("consumables tracked", stats.liquids === 1 && stats.edibles === 1);
 
 const creatures = await client.callTool({ name: "list_creatures", arguments: {} });
 const creatureList = JSON.parse(creatures.content[0].text);
