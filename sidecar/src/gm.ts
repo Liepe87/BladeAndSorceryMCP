@@ -181,11 +181,11 @@ export class GameMaster {
     const rule = this.levelRule();
     if (rule?.quiet) return;
 
-    // Home: occasional burglars sneaking in through the entrances.
+    // Home: occasional burglars arriving from far away, hunting the player.
     const burglar = rule?.burglar;
     if (this.currentLevel === "Home" && burglar?.enabled && now - this.lastBurglarAt > burglar.minIntervalMs) {
       this.lastBurglarAt = now;
-      this.spawnBurglars(burglar.maxEnemies, rule?.spawnPoints);
+      this.spawnBurglars(burglar);
     }
 
     // Wave settle: enemies must stay at zero for a settle window (the game
@@ -220,20 +220,21 @@ export class GameMaster {
     return this.config.levelRules?.[this.currentLevel];
   }
 
-  private spawnBurglars(maxEnemies: number, spawnPoints?: number[][]): void {
-    if (!spawnPoints || spawnPoints.length === 0) return;
-    const count = 1 + Math.floor(Math.random() * Math.max(1, maxEnemies));
+  private spawnBurglars(burglar: NonNullable<LevelRule["burglar"]>): void {
+    const count = 1 + Math.floor(Math.random() * Math.max(1, burglar.maxEnemies));
     const brains = ["HumanEasy", "HumanMedium"];
     const types = ["HumanMale", "HumanFemale"];
+    const min = burglar.distanceMin ?? 25;
+    const max = burglar.distanceMax ?? 45;
 
-    this.log(`[gm] ${count} burglar(s) sneaking into the home...`);
+    this.log(`[gm] ${count} burglar(s) approaching from outside...`);
     for (let i = 0; i < count; i++) {
-      const point = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
       const params = {
         creatureId: types[Math.floor(Math.random() * types.length)],
         brainId: brains[Math.floor(Math.random() * brains.length)],
         factionId: 3,
-        position: point,
+        distanceFromPlayer: Math.round(min + Math.random() * (max - min)),
+        attackPlayer: true,
       };
       void this.bridge.send("spawn_creature", params).catch(() => undefined);
     }

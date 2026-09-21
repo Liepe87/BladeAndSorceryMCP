@@ -5,7 +5,13 @@ export interface LevelRule {
   quiet?: boolean;
   spawnPoints?: number[][];
   llmGuidance?: string;
-  burglar?: { enabled: boolean; minIntervalMs: number; maxEnemies: number };
+  burglar?: {
+    enabled: boolean;
+    minIntervalMs: number;
+    maxEnemies: number;
+    distanceMin?: number;
+    distanceMax?: number;
+  };
 }
 
 export interface LlmConfig {
@@ -70,7 +76,7 @@ function buildSystemPrompt(world: LlmWorld, config: LlmConfig): string {
     '{"comment": "one short in-character dungeon-master sentence", "actions": [{"tool": "...", "args": {...}}]}',
     "",
     "Allowed tools and arguments:",
-    `- spawn_creature: {"creatureId": one of ${JSON.stringify(ALLOWED_CREATURES)}, "relativeToPlayer": [dx,dy,dz] OR "position": [x,y,z], "brainId": one of ${JSON.stringify(ALLOWED_BRAINS)}, "factionId": 3 for enemy}`,
+    `- spawn_creature: {"creatureId": one of ${JSON.stringify(ALLOWED_CREATURES)}, "relativeToPlayer": [dx,dy,dz] OR "position": [x,y,z] OR "distanceFromPlayer": number (5-60, spawns far away on walkable ground, never in water), "brainId": one of ${JSON.stringify(ALLOWED_BRAINS)}, "factionId": 3 for enemy, "attackPlayer": true makes the enemy hunt the player immediately}`,
     `- spawn_item: {"itemId": one of ${JSON.stringify(CURATED_ITEMS)}, "relativeToPlayer": [dx,dy,dz], "owned": true|false}`,
     "- despawn_entity: {\"instanceId\": number}",
     "",
@@ -213,7 +219,18 @@ export class LlmReactor {
     const params: Record<string, unknown> = { creatureId };
     if (typeof args.relativeToPlayer === "object" && Array.isArray(args.relativeToPlayer)) {
       params.relativeToPlayer = args.relativeToPlayer;
+    } else if (typeof args.position === "object" && Array.isArray(args.position)) {
+      params.position = args.position;
+    } else if (typeof args.distanceFromPlayer === "number") {
+      const d = args.distanceFromPlayer;
+      if (d >= 5 && d <= 60) {
+        params.distanceFromPlayer = d;
+      } else {
+        this.log(`[gm-llm] rejected distanceFromPlayer ${d} (must be 5-60)`);
+        return;
+      }
     }
+    if (args.attackPlayer === true) params.attackPlayer = true;
     const brainId = String(args.brainId ?? "");
     if (ALLOWED_BRAINS.includes(brainId)) params.brainId = brainId;
     if (args.factionId !== undefined) params.factionId = args.factionId;

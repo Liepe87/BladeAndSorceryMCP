@@ -116,8 +116,11 @@ send({
 await new Promise((r) => setTimeout(r, 2500));
 const burglarSpawns = commands.slice(commandsBeforeHome).filter((c) => c.op === "spawn_creature");
 check(
-  "home burglars spawned at entrance points",
-  burglarSpawns.length >= 1 && burglarSpawns.every((c) => Array.isArray(c.params.position)),
+  "home burglars spawn far away and hunt the player",
+  burglarSpawns.length >= 1 &&
+    burglarSpawns.every(
+      (c) => typeof c.params.distanceFromPlayer === "number" && c.params.attackPlayer === true,
+    ),
 );
 
 socket.end();

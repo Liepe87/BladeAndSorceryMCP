@@ -108,12 +108,47 @@ namespace BaSMcpBridge
             {
                 pos = new Vector3((float)posArr[0], (float)posArr[1], (float)posArr[2]);
             }
+            else if (p?["distanceFromPlayer"] != null)
+            {
+                // Spawn far away on walkable ground (navmesh), so enemies
+                // approach naturally instead of appearing next to the player.
+                float distance = (float)p["distanceFromPlayer"];
+                if (Player.local == null)
+                {
+                    throw new Exception("no player to measure distance from");
+                }
+                pos = ResolveDistanceSpawn(Player.local.transform.position, distance);
+            }
             if (p?["rotationY"] != null)
             {
                 rotationY = (float)p["rotationY"];
             }
 
-            data.SpawnAsync(pos, rotationY, null, true, null, null);
+            bool attackPlayer = p?["attackPlayer"] != null && (bool)p["attackPlayer"];
+            Action<Creature> onSpawned = null;
+            if (attackPlayer)
+            {
+                onSpawned = delegate(Creature creature)
+                {
+                    if (creature == null || Player.local == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        // Put the creature in combat with the player immediately,
+                        // so it converges on their location.
+                        creature.brain.currentTarget = Player.local.creature;
+                        creature.brain.SetState(Brain.State.Combat);
+                    }
+                    catch
+                    {
+                        // non-fatal - the brain will detect the player normally
+                    }
+                };
+            }
+
+            data.SpawnAsync(pos, rotationY, null, true, null, onSpawned);
 
             return new JObject
             {
@@ -121,8 +156,33 @@ namespace BaSMcpBridge
                 { "creatureId", creatureId },
                 { "factionId", factionId },
                 { "brainId", data.brainId },
+                { "attackPlayer", attackPlayer },
                 { "position", StatePublisher.Vec(pos) }
             };
+        }
+
+        // Finds a walkable point on the navmesh at roughly the given distance
+        // from the origin in a random horizontal direction. Falls back to
+        // closer distances so spawns never fail on small maps. Water and other
+        // non-walkable areas are excluded by the navmesh.
+        private static Vector3 ResolveDistanceSpawn(Vector3 origin, float distance)
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                float d = distance / (1 << attempt);
+                if (d < 2f)
+                {
+                    d = 2f;
+                }
+                float angle = UnityEngine.Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                Vector3 candidate = origin + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * d;
+                UnityEngine.AI.NavMeshHit hit;
+                if (UnityEngine.AI.NavMesh.SamplePosition(candidate, out hit, 8f, UnityEngine.AI.NavMesh.AllAreas))
+                {
+                    return hit.position;
+                }
+            }
+            throw new Exception("no walkable ground found near the player");
         }
 
         private static JObject SpawnItem(JObject p)

@@ -117,5 +117,32 @@ const quietReactor = new LlmReactor(
 await quietReactor.react("waveEnd");
 check("quiet level never calls the LLM", fetchCalls === 0);
 
+// 8: distanceFromPlayer + attackPlayer pass through to the game
+commands.length = 0;
+reactor = new LlmReactor(
+  fakeChannel, fakeWorld, guards, config, "test-key", fakeLog,
+  fakeFetchFor('{"comment":"They come from the treeline!","actions":[{"tool":"spawn_creature","args":{"creatureId":"HumanMale","distanceFromPlayer":30,"attackPlayer":true,"brainId":"HumanMedium"}}]}'),
+);
+await reactor.react("waveEnd");
+check(
+  "distance spawn + attack pass through",
+  commands.some(
+    (c) =>
+      c.op === "spawn_creature" &&
+      c.params.distanceFromPlayer === 30 &&
+      c.params.attackPlayer === true &&
+      c.params.brainId === "HumanMedium",
+  ),
+);
+
+// 9: out-of-range distance rejected
+commands.length = 0;
+reactor = new LlmReactor(
+  fakeChannel, fakeWorld, guards, config, "test-key", fakeLog,
+  fakeFetchFor('{"comment":"x","actions":[{"tool":"spawn_creature","args":{"creatureId":"HumanMale","distanceFromPlayer":999}}]}'),
+);
+await reactor.react("waveEnd");
+check("out-of-range distance rejected", commands.length === 0);
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

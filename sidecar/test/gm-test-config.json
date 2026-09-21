@@ -13,8 +13,7 @@
   "levelRules": {
     "Arena": { "spawnPoints": [[-11.76, 0.09, -10.59]] },
     "Home": {
-      "burglar": { "enabled": true, "minIntervalMs": 1500, "maxEnemies": 2 },
-      "spawnPoints": [[37.7, 1.87, -46.4], [40.5, 1.87, -46.4]]
+      "burglar": { "enabled": true, "minIntervalMs": 1500, "maxEnemies": 2, "distanceMin": 25, "distanceMax": 45 }
     },
     "Shop": { "quiet": true }
   }
