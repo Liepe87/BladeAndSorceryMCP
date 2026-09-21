@@ -65,8 +65,6 @@ await new Promise((r) => setTimeout(r, 2000));
 
 const earlyActions = commands.filter((c) => c.op === "spawn_item" || c.op === "show_message");
 check("low health triggers nothing (no potions, no messages)", earlyActions.length === 0);
-const cleanups = commands.filter((c) => c.op === "despawn_entity" && c.params.instanceId === 999);
-check("void corpse cleaned up", cleanups.length >= 1);
 
 // Kill 1 at [1,0,1]: loot roll (chance 1.0, table = Poo) drops Poo
 send({ type: "event", name: "creature_kill", data: { instanceId: 500, type: "HumanMale", pos: [1, 0, 1] } });

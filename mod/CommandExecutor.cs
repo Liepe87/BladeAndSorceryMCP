@@ -319,6 +319,11 @@ namespace BaSMcpBridge
 
         private static JObject DespawnCreature(Creature creature)
         {
+            // Only use the game's normal despawn. A hard Destroy() bypasses
+            // the game's pool/registry cleanup and corrupts the creature pool,
+            // which breaks spawning (slow/invisible enemies). Broken creatures
+            // (e.g. a shopkeeper outside a shop) simply won't despawn here;
+            // that is a vanilla game bug, not something this mod can fix.
             try
             {
                 creature.Despawn(0f);
@@ -326,26 +331,8 @@ namespace BaSMcpBridge
             }
             catch (Exception e)
             {
-                // Broken creature whose brain crashes on stop (e.g. a shopkeeper
-                // outside a shop level, or a void corpse). Hard-destroy it AND
-                // clean the registries - Destroy() bypasses the crashing
-                // Brain.Stop path entirely, and the explicit Remove keeps the
-                // game's own systems from iterating a destroyed entry.
-                Debug.LogWarning("[BaSMcp] despawn threw, force-destroying: " + e.Message);
-                try
-                {
-                    if (creature != null && creature.gameObject != null)
-                    {
-                        UnityEngine.Object.Destroy(creature.gameObject);
-                    }
-                    Creature.all.Remove(creature);
-                    Creature.allActive.Remove(creature);
-                    return new JObject { { "despawned", true }, { "kind", "creature" }, { "forced", true } };
-                }
-                catch (Exception e2)
-                {
-                    throw new Exception("creature despawn failed (normal and forced): " + e2.Message);
-                }
+                Debug.LogWarning("[BaSMcp] despawn failed: " + e.Message);
+                return new JObject { { "despawned", false }, { "kind", "creature" } };
             }
         }
 

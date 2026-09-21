@@ -4,8 +4,6 @@ import type { LlmConfig, LevelRule } from "./gm-llm.js";
 
 export interface GmConfig {
   enabled: boolean;
-  cleanupVoidCorpses: boolean;
-  waveSettleMs: number;
   lootDrops: {
     enabled: boolean;
     chance: number;
@@ -18,8 +16,6 @@ export interface GmConfig {
 
 export const defaultGmConfig: GmConfig = {
   enabled: true,
-  cleanupVoidCorpses: true,
-  waveSettleMs: 10000,
   lootDrops: {
     enabled: true,
     chance: 0.3,
@@ -51,20 +47,15 @@ interface SnapshotCreature {
 /**
  * Always-on game master. Subscribes to the bridge's message stream (events +
  * snapshots) and reacts through the same command channel the MCP tools use.
- * Tier 1: deterministic rules. Tier 2 (LLM reactions) slots into the same
- * hooks later.
+ *
+ * Deliberately conservative: it never force-destroys creatures (that corrupts
+ * the game's pool) and it relies on the game's own "wave_end" signal rather
+ * than guessing from alive-counts, which fired falsely mid-wave.
  */
 export class GameMaster {
   private cooldowns = new Map<string, number>();
   private killTimes: number[] = [];
   private sessionKills = 0;
-  private enemiesAlive = 0;
-  private lastEnemiesAlive = 0;
-  private playerHealth = -1;
-  private zeroSince = 0;
-  private waveSettled = false;
-  private voidCorpses = new Map<number, number>(); // instanceId -> y
-  private lastCleanupAt = 0;
   private currentLevel: string | null = null;
   private killsAtLastWaveEnd = 0;
   private lastBurglarAt = Date.now(); // grace period: no rolls right after startup
@@ -83,57 +74,22 @@ export class GameMaster {
   private handleMessage(msg: Record<string, unknown>): void {
     if (!this.config.enabled) return;
     if (msg.type === "snapshot") this.onSnapshot(msg);
-    else if (msg.type === "event" && msg.name === "creature_kill") {
-      this.onKill((msg.data as { pos?: number[] } | undefined)?.pos);
+    else if (msg.type === "event") {
+      if (msg.name === "creature_kill") {
+        this.onKill((msg.data as { pos?: number[] } | undefined)?.pos);
+      } else if (msg.name === "wave_end") {
+        this.onWaveEnd();
+      }
     }
   }
 
   private onSnapshot(msg: Record<string, unknown>): void {
     const level = msg.level as { id?: string | null } | undefined;
     if (level?.id) this.currentLevel = level.id;
-
-    const creatures = (msg.creatures as SnapshotCreature[] | undefined) ?? [];
-    this.enemiesAlive = creatures.filter((c) => !c.isPlayer && c.state === "Alive").length;
-
-    const player = msg.player as { health?: number } | undefined;
-    if (player?.health !== undefined) this.playerHealth = player.health;
-
-    const rule = this.levelRule();
-    if (rule?.quiet) {
-      // Safe zone: keep counters fresh but do nothing.
-      this.lastEnemiesAlive = this.enemiesAlive;
-      return;
-    }
-
-    // Track void-falling corpses (dead + far below the floor) for cleanup.
-    if (this.config.cleanupVoidCorpses) {
-      for (const c of creatures) {
-        if (!c.isPlayer && c.state === "Dead" && c.pos.length === 3 && c.pos[1] < -50) {
-          this.voidCorpses.set(c.instanceId, c.pos[1]);
-        }
-      }
-    }
-
-    // Low health gets no special treatment - loot drops are the only potion
-    // source. The challenge is the point.
-
-    // Wave transition bookkeeping: when enemies drop from >0 to 0, arm the
-    // settle timer. Settling itself happens in tick() so it works even if
-    // snapshots pause.
-    const prev = this.lastEnemiesAlive;
-    this.lastEnemiesAlive = this.enemiesAlive;
-    if (this.enemiesAlive === 0) {
-      if (prev > 0 && this.zeroSince === 0) {
-        this.zeroSince = Date.now();
-        this.waveSettled = false;
-      }
-    } else {
-      this.zeroSince = 0;
-      this.waveSettled = false;
-    }
   }
 
   private onWaveEnd(): void {
+    if (this.levelRule()?.quiet) return;
     // Home has no waves - it gets burglars instead.
     if (this.currentLevel === "Home") return;
     // Only react to a wave that actually had kills since the last reaction.
@@ -142,22 +98,6 @@ export class GameMaster {
 
     this.announce(`Wave cleared - ${this.sessionKills} kills this session.`, 6);
     void this.llm?.react("waveEnd");
-  }
-
-  // A Shopkeeper creature outside a shop level breaks the wave system: its
-  // brain dereferences a null shop reference every frame (OnCycle) and when
-  // despawned (OnBrainStop) - the latter crashes the START button. Remove any
-  // lingering shopkeepers on every tick, so the cleanup cannot be starved by
-  // the wave-complete logic that the shopkeeper itself is breaking.
-  private cleanupLingeringShopkeepers(): void {
-    for (const c of this.bridge.world.creatures.values()) {
-      if (!c.isPlayer && c.type === "Shopkeeper") {
-        this.log(`[gm] removing lingering shopkeeper ${c.instanceId}`);
-        void this.bridge
-          .send("despawn_entity", { instanceId: c.instanceId })
-          .catch(() => undefined);
-      }
-    }
   }
 
   private onKill(killPos?: number[]): void {
@@ -211,51 +151,20 @@ export class GameMaster {
 
   private tick(): void {
     if (!this.config.enabled) return;
-
-    const now = Date.now();
     const rule = this.levelRule();
     if (rule?.quiet) return;
-
-    // Remove any lingering shopkeepers immediately (see method comment).
-    this.cleanupLingeringShopkeepers();
 
     // Home: occasional burglars arriving from far away, hunting the player.
     // One chance roll per cooldown window - entering Home does not guarantee
     // a break-in, and the first window after startup is always quiet.
     const burglar = rule?.burglar;
-    if (this.currentLevel === "Home" && burglar?.enabled && now - this.lastBurglarAt > burglar.minIntervalMs) {
-      this.lastBurglarAt = now; // one roll per window, win or lose
+    if (this.currentLevel === "Home" && burglar?.enabled && Date.now() - this.lastBurglarAt > burglar.minIntervalMs) {
+      this.lastBurglarAt = Date.now(); // one roll per window, win or lose
       if (Math.random() < (burglar.chance ?? 0.35)) {
         this.spawnBurglars(burglar);
       } else {
         this.log("[gm] home quiet tonight - no burglars");
       }
-    }
-
-    // Wave settle: enemies must stay at zero for a settle window (the game
-    // sometimes feeds stragglers several seconds after the last kill).
-    if (
-      this.zeroSince > 0 &&
-      !this.waveSettled &&
-      now - this.zeroSince > this.config.waveSettleMs
-    ) {
-      this.waveSettled = true;
-      this.onWaveEnd();
-    }
-
-    if (!this.config.cleanupVoidCorpses) return;
-    // Throttle: at most one despawn per 500ms so cleanup never floods the game.
-    for (const [instanceId] of this.voidCorpses) {
-      if (now - this.lastCleanupAt < 500) break;
-      this.lastCleanupAt = now;
-      this.voidCorpses.delete(instanceId);
-      void this.bridge
-        .send("despawn_entity", { instanceId })
-        .then((result) => {
-          const r = result as { despawned?: boolean } | undefined;
-          if (r?.despawned === true) this.log(`[gm] cleaned void corpse ${instanceId}`);
-        })
-        .catch(() => undefined);
     }
   }
 

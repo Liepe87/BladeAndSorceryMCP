@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ThunderRoad;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace BaSMcpBridge
 {
@@ -12,6 +13,9 @@ namespace BaSMcpBridge
         // Coalescing: combat hits are frequent; send at most one per creature
         // per second to keep the event stream light.
         private static readonly Dictionary<int, float> LastHitSent = new Dictionary<int, float>();
+
+        // Cached so Add/Remove use the same delegate reference.
+        private static readonly UnityAction<WaveSpawner> WaveStoppedListener = new UnityAction<WaveSpawner>(OnWaveStopped);
 
         public static void Subscribe()
         {
@@ -29,6 +33,7 @@ namespace BaSMcpBridge
             EventManager.onEdibleConsumed += OnEdibleConsumed;
             EventManager.onLevelLoad += OnLevelLoad;
             EventManager.onLevelUnload += OnLevelUnload;
+            WaveSpawner.OnWaveSpawnerStopRunningEvent.AddListener(WaveStoppedListener);
         }
 
         public static void Unsubscribe()
@@ -47,6 +52,20 @@ namespace BaSMcpBridge
             EventManager.onEdibleConsumed -= OnEdibleConsumed;
             EventManager.onLevelLoad -= OnLevelLoad;
             EventManager.onLevelUnload -= OnLevelUnload;
+            WaveSpawner.OnWaveSpawnerStopRunningEvent.RemoveListener(WaveStoppedListener);
+        }
+
+        // The game's own wave-complete signal - fires when a wave stops running.
+        // This is authoritative, unlike counting alive creatures.
+        private static void OnWaveStopped(WaveSpawner waveSpawner)
+        {
+            try
+            {
+                Send("wave_end", new JObject());
+            }
+            catch
+            {
+            }
         }
 
         // ---------- combat perception ----------

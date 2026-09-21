@@ -1,7 +1,5 @@
 {
   "enabled": true,
-  "cleanupVoidCorpses": false,
-  "waveSettleMs": 10000,
   "lootDrops": {
     "enabled": true,
     "chance": 0.3,
