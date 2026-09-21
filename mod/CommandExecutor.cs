@@ -103,11 +103,13 @@ namespace BaSMcpBridge
                 data.containerID = containerId;
             }
 
-            Vector3 pos = Player.local != null
-                ? Player.local.head.transform.position + Player.local.head.transform.forward * 2f
+            Player localPlayer = Player.local;
+            PlayerHead head = localPlayer != null ? localPlayer.head : null;
+            Vector3 pos = head != null
+                ? head.transform.position + head.transform.forward * 2f
                 : Vector3.zero;
-            float rotationY = Player.local != null
-                ? Player.local.head.transform.rotation.eulerAngles.y + 180f
+            float rotationY = head != null
+                ? head.transform.rotation.eulerAngles.y + 180f
                 : 0f;
 
             if (p?["position"] is JArray posArr && posArr.Count == 3)
@@ -317,32 +319,23 @@ namespace BaSMcpBridge
 
         private static JObject DespawnCreature(Creature creature)
         {
-            // Corpses that fell through the world can enter a broken state
-            // where the normal despawn path throws (that's why the game keeps
-            // retrying them forever). Fall back to a hard destroy - but also
-            // remove the creature from the registries, because Destroy()
-            // bypasses the game's own cleanup and a destroyed creature left in
-            // Creature.all/allActive breaks every system that iterates them
-            // (snapshots, hit events, spawns).
+            // Deliberately NO hard-destroy fallback. Destroy() bypasses the
+            // game's registry cleanup, leaving destroyed entries that corrupt
+            // every system which iterates Creature.all/allActive - including
+            // the wave system's "how many enemies remain" tracking, which is
+            // exactly what broke the arena's START button. If the normal
+            // despawn throws (broken void corpses), leave the corpse alone;
+            // the game's own cleaner keeps retrying harmlessly.
             try
             {
                 creature.Despawn(0f);
+                return new JObject { { "despawned", true }, { "kind", "creature" } };
             }
-            catch
+            catch (Exception e)
             {
-                try
-                {
-                    UnityEngine.Object.Destroy(creature.gameObject);
-                    Creature.all.Remove(creature);
-                    Creature.allActive.Remove(creature);
-                    return new JObject { { "despawned", true }, { "kind", "creature" }, { "forced", true } };
-                }
-                catch (Exception e2)
-                {
-                    throw new Exception("creature despawn failed (normal and forced): " + e2.Message);
-                }
+                Debug.LogWarning("[BaSMcp] despawn failed (left for the game): " + e.Message);
+                return new JObject { { "despawned", false }, { "kind", "creature" } };
             }
-            return new JObject { { "despawned", true }, { "kind", "creature" } };
         }
 
         private static JObject BuildState()
