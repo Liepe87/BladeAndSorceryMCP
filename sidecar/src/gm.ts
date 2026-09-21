@@ -141,14 +141,14 @@ export class GameMaster {
     this.killsAtLastWaveEnd = this.sessionKills;
 
     this.announce(`Wave cleared - ${this.sessionKills} kills this session.`, 6);
-    this.cleanupLingeringShopkeepers();
     void this.llm?.react("waveEnd");
   }
 
   // A Shopkeeper creature outside a shop level breaks the wave system: its
-  // brain dereferences a null shop reference every frame and crashes the
-  // START button when WaveSpawner.Clean() tries to despawn it. Remove any
-  // lingering shopkeepers once a wave settles so the next wave can start.
+  // brain dereferences a null shop reference every frame (OnCycle) and when
+  // despawned (OnBrainStop) - the latter crashes the START button. Remove any
+  // lingering shopkeepers on every tick, so the cleanup cannot be starved by
+  // the wave-complete logic that the shopkeeper itself is breaking.
   private cleanupLingeringShopkeepers(): void {
     for (const c of this.bridge.world.creatures.values()) {
       if (!c.isPlayer && c.type === "Shopkeeper") {
@@ -215,6 +215,9 @@ export class GameMaster {
     const now = Date.now();
     const rule = this.levelRule();
     if (rule?.quiet) return;
+
+    // Remove any lingering shopkeepers immediately (see method comment).
+    this.cleanupLingeringShopkeepers();
 
     // Home: occasional burglars arriving from far away, hunting the player.
     // One chance roll per cooldown window - entering Home does not guarantee
