@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "cleanupVoidCorpses": true,
+  "waveSettleMs": 10000,
+  "lowHealthPotion": { "enabled": true, "threshold": 60, "cooldownMs": 120000 },
+  "waveEndReward": {
+    "enabled": true,
+    "minSessionKills": 5,
+    "cooldownMs": 300000,
+    "items": ["PotionHealth", "SwordLongCommon", "AxeShortWar", "ThrowablesDagger"]
+  },
+  "killStreakLog": { "enabled": true, "kills": 3, "windowMs": 10000 }
+}

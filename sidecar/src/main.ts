@@ -1,10 +1,15 @@
 import http from "node:http";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { TcpBridge } from "./tcp-bridge.js";
 import { createMcpServer } from "./mcp.js";
 import { loadAllowlist, SpawnLimiter } from "./guardrails.js";
+import { GameMaster, defaultGmConfig } from "./gm.js";
+import type { GmConfig } from "./gm.js";
 
 // Logs go to stderr so stdout stays clean for the MCP stdio transport.
 const log = (msg: string): void =>
@@ -23,6 +28,27 @@ const guards = {
   ),
   maxCreatures: Number(process.env.BASMCP_MAX_CREATURES ?? 20),
 };
+
+// Game master: observes the bridge stream and reacts on its own.
+function loadGmConfig(): GmConfig {
+  const defaultPath = join(dirname(fileURLToPath(import.meta.url)), "..", "gm.json");
+  const path = process.env.BASMCP_GM_CONFIG ?? defaultPath;
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
+    return { ...defaultGmConfig, ...(raw as Partial<GmConfig>) };
+  } catch (e) {
+    log(`GM config load failed (${(e as Error).message}) - using defaults`);
+    return defaultGmConfig;
+  }
+}
+
+if (process.env.BASMCP_GM !== "0") {
+  const gmConfig = loadGmConfig();
+  if (gmConfig.enabled) {
+    new GameMaster(bridge, gmConfig, log);
+    log("game master enabled");
+  }
+}
 
 // stdio instance - for clients that spawn the sidecar themselves
 const stdioServer = createMcpServer(bridge, guards);

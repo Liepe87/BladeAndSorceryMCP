@@ -14,12 +14,19 @@ export class TcpBridge {
   private pending = new Map<number, PendingOp>();
   private nextId = 1;
   private verbose = process.env.BASMCP_VERBOSE === "1";
+  private listeners: ((msg: Record<string, unknown>) => void)[] = [];
 
   constructor(
     private port: number,
     private log: (msg: string) => void,
   ) {
     this.server = net.createServer((socket) => this.onConnection(socket));
+  }
+
+  // Subscribe to every parsed game message (events, snapshots, hello).
+  // Used by the game master to observe and react without MCP involvement.
+  onMessage(callback: (msg: Record<string, unknown>) => void): void {
+    this.listeners.push(callback);
   }
 
   start(): void {
@@ -75,6 +82,7 @@ export class TcpBridge {
     }
 
     this.world.apply(msg);
+    for (const listener of this.listeners) listener(msg);
   }
 
   send(op: string, params: Record<string, unknown> = {}, timeoutMs = 8000): Promise<unknown> {
