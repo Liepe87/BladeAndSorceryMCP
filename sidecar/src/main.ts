@@ -10,6 +10,7 @@ import { createMcpServer } from "./mcp.js";
 import { loadAllowlist, SpawnLimiter } from "./guardrails.js";
 import { GameMaster, defaultGmConfig } from "./gm.js";
 import type { GmConfig } from "./gm.js";
+import { LlmReactor, defaultLlmConfig } from "./gm-llm.js";
 
 // Logs go to stderr so stdout stays clean for the MCP stdio transport.
 const log = (msg: string): void =>
@@ -35,7 +36,8 @@ function loadGmConfig(): GmConfig {
   const path = process.env.BASMCP_GM_CONFIG ?? defaultPath;
   try {
     const raw = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
-    return { ...defaultGmConfig, ...(raw as Partial<GmConfig>) };
+    const llm = { ...defaultLlmConfig, ...((raw as { llm?: object }).llm ?? {}) };
+    return { ...defaultGmConfig, ...(raw as Partial<GmConfig>), llm };
   } catch (e) {
     log(`GM config load failed (${(e as Error).message}) - using defaults`);
     return defaultGmConfig;
@@ -45,7 +47,17 @@ function loadGmConfig(): GmConfig {
 if (process.env.BASMCP_GM !== "0") {
   const gmConfig = loadGmConfig();
   if (gmConfig.enabled) {
-    new GameMaster(bridge, gmConfig, log);
+    let llmReactor: LlmReactor | undefined;
+    if (gmConfig.llm?.enabled) {
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) {
+        log("GM LLM enabled in config but OPENROUTER_API_KEY is not set - LLM disabled");
+      } else {
+        llmReactor = new LlmReactor(bridge, bridge.world, guards, gmConfig.llm, apiKey, log);
+        log(`game master LLM enabled (${gmConfig.llm.model})`);
+      }
+    }
+    new GameMaster(bridge, gmConfig, log, llmReactor);
     log("game master enabled");
   }
 }

@@ -106,6 +106,10 @@ export class WorldModel {
     return n;
   }
 
+  recentEvents(count: number): { t: number; name: string; data: unknown }[] {
+    return this.eventLog.slice(-count);
+  }
+
   summary(): Record<string, unknown> {
     return {
       connected: this.connected,

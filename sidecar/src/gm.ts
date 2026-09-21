@@ -1,4 +1,6 @@
 import type { TcpBridge } from "./tcp-bridge.js";
+import type { LlmReactor } from "./gm-llm.js";
+import type { LlmConfig } from "./gm-llm.js";
 
 export interface GmConfig {
   enabled: boolean;
@@ -12,6 +14,7 @@ export interface GmConfig {
     items: string[];
   };
   killStreakLog: { enabled: boolean; kills: number; windowMs: number };
+  llm?: LlmConfig;
 }
 
 export const defaultGmConfig: GmConfig = {
@@ -57,6 +60,7 @@ export class GameMaster {
     private bridge: TcpBridge,
     private config: GmConfig,
     private log: (msg: string) => void,
+    private llm?: LlmReactor,
   ) {
     bridge.onMessage((msg) => this.handleMessage(msg));
     setInterval(() => this.tick(), 1000);
@@ -97,6 +101,7 @@ export class GameMaster {
         void this.bridge
           .send("spawn_item", { itemId: "PotionHealth", relativeToPlayer: [1, 0.2, 1] })
           .catch(() => undefined);
+        void this.llm?.react("lowHealth");
       });
     }
 
@@ -120,6 +125,7 @@ export class GameMaster {
     this.log(
       `[gm] wave settled - session kills: ${this.sessionKills}, player health: ${Math.round(this.playerHealth)}`,
     );
+    void this.llm?.react("waveEnd");
     const reward = this.config.waveEndReward;
     if (reward.enabled && this.sessionKills >= reward.minSessionKills) {
       this.gate("waveEndReward", reward.cooldownMs, () => {
@@ -143,6 +149,7 @@ export class GameMaster {
     if (this.killTimes.length >= streak.kills) {
       this.log(`[gm] kill streak: ${this.killTimes.length} kills in ${streak.windowMs / 1000}s`);
       this.killTimes = []; // reset so the next streak needs fresh kills
+      void this.llm?.react("killStreak");
     }
   }
 

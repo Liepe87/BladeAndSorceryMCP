@@ -9,5 +9,14 @@
     "cooldownMs": 300000,
     "items": ["PotionHealth", "SwordLongCommon", "AxeShortWar", "ThrowablesDagger"]
   },
-  "killStreakLog": { "enabled": true, "kills": 3, "windowMs": 10000 }
+  "killStreakLog": { "enabled": true, "kills": 3, "windowMs": 10000 },
+  "llm": {
+    "enabled": true,
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "deepseek/deepseek-chat",
+    "minIntervalMs": 60000,
+    "triggers": ["waveEnd", "killStreak", "lowHealth"],
+    "timeoutMs": 30000,
+    "maxActions": 3
+  }
 }
