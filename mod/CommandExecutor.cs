@@ -173,20 +173,50 @@ namespace BaSMcpBridge
             {
                 if (creature != null && creature.GetInstanceID() == instanceId)
                 {
-                    creature.Despawn(0f);
-                    return new JObject { { "despawned", true }, { "kind", "creature" } };
+                    return DespawnCreature(creature);
                 }
             }
             foreach (Item item in Item.all)
             {
                 if (item != null && item.GetInstanceID() == instanceId)
                 {
-                    item.Despawn(0f);
-                    return new JObject { { "despawned", true }, { "kind", "item" } };
+                    try
+                    {
+                        item.Despawn(0f);
+                        return new JObject { { "despawned", true }, { "kind", "item" } };
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception("item despawn failed: " + e.Message);
+                    }
                 }
             }
 
             return new JObject { { "despawned", false } };
+        }
+
+        private static JObject DespawnCreature(Creature creature)
+        {
+            // Corpses that fell through the world can enter a broken state
+            // where the normal despawn path throws (that's why the game keeps
+            // retrying them forever). Fall back to a hard destroy.
+            try
+            {
+                creature.Despawn(0f);
+            }
+            catch
+            {
+                try
+                {
+                    UnityEngine.Object.Destroy(creature.gameObject);
+                    return new JObject { { "despawned", true }, { "kind", "creature" }, { "forced", true } };
+                }
+                catch (Exception e2)
+                {
+                    throw new Exception("creature despawn failed (normal and forced): " + e2.Message);
+                }
+            }
+            return new JObject { { "despawned", true }, { "kind", "creature" } };
         }
 
         private static JObject BuildState()
