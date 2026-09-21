@@ -58,7 +58,7 @@ export class GameMaster {
   private lastCleanupAt = 0;
   private currentLevel: string | null = null;
   private killsAtLastWaveEnd = 0;
-  private lastBurglarAt = 0;
+  private lastBurglarAt = Date.now(); // grace period: no rolls right after startup
 
   constructor(
     private bridge: TcpBridge,
@@ -182,10 +182,16 @@ export class GameMaster {
     if (rule?.quiet) return;
 
     // Home: occasional burglars arriving from far away, hunting the player.
+    // One chance roll per cooldown window - entering Home does not guarantee
+    // a break-in, and the first window after startup is always quiet.
     const burglar = rule?.burglar;
     if (this.currentLevel === "Home" && burglar?.enabled && now - this.lastBurglarAt > burglar.minIntervalMs) {
-      this.lastBurglarAt = now;
-      this.spawnBurglars(burglar);
+      this.lastBurglarAt = now; // one roll per window, win or lose
+      if (Math.random() < (burglar.chance ?? 0.35)) {
+        this.spawnBurglars(burglar);
+      } else {
+        this.log("[gm] home quiet tonight - no burglars");
+      }
     }
 
     // Wave settle: enemies must stay at zero for a settle window (the game

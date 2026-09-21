@@ -21,7 +21,7 @@
       "llmGuidance": "Enemies enter through the arena entrances. Spawn them ONLY at the listed spawn points, never within 8 metres of the player. Do not react to simply entering an empty arena - only react after an actual fight."
     },
     "Home": {
-      "burglar": { "enabled": true, "minIntervalMs": 900000, "maxEnemies": 2, "distanceMin": 25, "distanceMax": 45 },
+      "burglar": { "enabled": true, "minIntervalMs": 900000, "maxEnemies": 2, "distanceMin": 25, "distanceMax": 45, "chance": 0.35 },
       "llmGuidance": "The player's home. Occasionally 1-2 burglars arrive from far away and converge on the player. Use distanceFromPlayer (25-45) with attackPlayer:true for burglars. Keep it rare and roleplay them as burglars in your comment."
     },
     "Shop": {

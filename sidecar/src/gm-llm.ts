@@ -11,6 +11,7 @@ export interface LevelRule {
     maxEnemies: number;
     distanceMin?: number;
     distanceMax?: number;
+    chance?: number;
   };
 }
 
