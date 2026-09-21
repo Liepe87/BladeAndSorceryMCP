@@ -7,11 +7,10 @@ export interface GmConfig {
   cleanupVoidCorpses: boolean;
   waveSettleMs: number;
   lowHealthPotion: { enabled: boolean; threshold: number; cooldownMs: number };
-  waveEndReward: {
+  lootDrops: {
     enabled: boolean;
-    minSessionKills: number;
-    cooldownMs: number;
-    items: string[];
+    chance: number;
+    items: { id: string; weight: number }[];
   };
   killStreakLog: { enabled: boolean; kills: number; windowMs: number };
   levelRules?: Record<string, LevelRule>;
@@ -23,11 +22,23 @@ export const defaultGmConfig: GmConfig = {
   cleanupVoidCorpses: true,
   waveSettleMs: 10000,
   lowHealthPotion: { enabled: true, threshold: 60, cooldownMs: 120000 },
-  waveEndReward: {
+  lootDrops: {
     enabled: true,
-    minSessionKills: 5,
-    cooldownMs: 300000,
-    items: ["PotionHealth", "SwordLongCommon", "AxeShortWar", "ThrowablesDagger"],
+    chance: 0.3,
+    items: [
+      { id: "PotionHealth", weight: 5 },
+      { id: "SpellBombFire", weight: 3 },
+      { id: "SpellBombGravity", weight: 3 },
+      { id: "SpellBombLightning", weight: 3 },
+      { id: "PotionRumFire", weight: 3 },
+      { id: "PotionRumGravity", weight: 3 },
+      { id: "PotionRumLightning", weight: 3 },
+      { id: "CoinBag", weight: 4 },
+      { id: "GoldCoin", weight: 6 },
+      { id: "SilverCoin", weight: 6 },
+      { id: "CopperCoin", weight: 8 },
+      { id: "Poo", weight: 2 },
+    ],
   },
   killStreakLog: { enabled: true, kills: 3, windowMs: 10000 },
 };
@@ -59,6 +70,7 @@ export class GameMaster {
   private currentLevel: string | null = null;
   private killsAtLastWaveEnd = 0;
   private lastBurglarAt = Date.now(); // grace period: no rolls right after startup
+  private pityPotion = false; // set when the player is hurt: next kill drops a potion
 
   constructor(
     private bridge: TcpBridge,
@@ -74,7 +86,9 @@ export class GameMaster {
   private handleMessage(msg: Record<string, unknown>): void {
     if (!this.config.enabled) return;
     if (msg.type === "snapshot") this.onSnapshot(msg);
-    else if (msg.type === "event" && msg.name === "creature_kill") this.onKill();
+    else if (msg.type === "event" && msg.name === "creature_kill") {
+      this.onKill((msg.data as { pos?: number[] } | undefined)?.pos);
+    }
   }
 
   private onSnapshot(msg: Record<string, unknown>): void {
@@ -103,7 +117,8 @@ export class GameMaster {
       }
     }
 
-    // Low health potion
+    // Low health: flag a pity potion for the next kill instead of spawning
+    // items at the player's feet.
     const potion = this.config.lowHealthPotion;
     if (
       potion.enabled &&
@@ -111,10 +126,8 @@ export class GameMaster {
       this.playerHealth < potion.threshold
     ) {
       this.gate("lowHealthPotion", potion.cooldownMs, () => {
-        this.announce("A potion appears at your feet.", 4);
-        void this.bridge
-          .send("spawn_item", { itemId: "PotionHealth", relativeToPlayer: [1, 0.2, 1] })
-          .catch(() => undefined);
+        this.pityPotion = true;
+        this.announce("You're badly hurt - your next kill may yield a potion.", 5);
         void this.llm?.react("lowHealth");
       });
     }
@@ -144,21 +157,15 @@ export class GameMaster {
 
     this.announce(`Wave cleared - ${this.sessionKills} kills this session.`, 6);
     void this.llm?.react("waveEnd");
-    const reward = this.config.waveEndReward;
-    if (reward.enabled && this.sessionKills >= reward.minSessionKills) {
-      this.gate("waveEndReward", reward.cooldownMs, () => {
-        const itemId = reward.items[Math.floor(Math.random() * reward.items.length)];
-        this.log(`[gm] wave reward: ${itemId}`);
-        void this.bridge
-          .send("spawn_item", { itemId, relativeToPlayer: [0.5, 0.2, 1] })
-          .catch(() => undefined);
-      });
-    }
   }
 
-  private onKill(): void {
+  private onKill(killPos?: number[]): void {
     this.sessionKills += 1;
     if (this.levelRule()?.quiet) return;
+
+    // Loot drops at the corpse, not at the player's feet.
+    this.dropLoot(killPos);
+
     const streak = this.config.killStreakLog;
     if (!streak.enabled) return;
 
@@ -170,6 +177,41 @@ export class GameMaster {
       this.killTimes = []; // reset so the next streak needs fresh kills
       void this.llm?.react("killStreak");
     }
+  }
+
+  private dropLoot(killPos?: number[]): void {
+    const cfg = this.config.lootDrops;
+    if (!cfg?.enabled || !killPos || killPos.length !== 3) return;
+
+    let itemId: string | null = null;
+    if (this.pityPotion) {
+      itemId = "PotionHealth";
+      this.pityPotion = false;
+    } else if (Math.random() < cfg.chance) {
+      itemId = this.pickWeighted(cfg.items);
+    }
+    if (!itemId) return;
+
+    // Slightly above the ground at the corpse position.
+    const position = [killPos[0], killPos[1] + 0.3, killPos[2]];
+    void this.bridge.send("spawn_item", { itemId, position }).catch(() => undefined);
+
+    if (itemId === "Poo") {
+      this.announce("...that smell isn't the arena.", 4);
+    } else {
+      this.log(`[gm] loot drop: ${itemId}`);
+    }
+  }
+
+  private pickWeighted(items: { id: string; weight: number }[]): string | null {
+    const total = items.reduce((sum, i) => sum + Math.max(0, i.weight), 0);
+    if (total <= 0) return null;
+    let roll = Math.random() * total;
+    for (const item of items) {
+      roll -= Math.max(0, item.weight);
+      if (roll <= 0) return item.id;
+    }
+    return items[items.length - 1]?.id ?? null;
   }
 
   private tick(): void {

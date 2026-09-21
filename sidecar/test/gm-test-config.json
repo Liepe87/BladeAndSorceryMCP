@@ -3,11 +3,10 @@
   "cleanupVoidCorpses": true,
   "waveSettleMs": 1000,
   "lowHealthPotion": { "enabled": true, "threshold": 90, "cooldownMs": 1000 },
-  "waveEndReward": {
+  "lootDrops": {
     "enabled": true,
-    "minSessionKills": 1,
-    "cooldownMs": 1000,
-    "items": ["PotionHealth"]
+    "chance": 1.0,
+    "items": [{ "id": "Poo", "weight": 1 }]
   },
   "killStreakLog": { "enabled": true, "kills": 2, "windowMs": 60000 },
   "levelRules": {

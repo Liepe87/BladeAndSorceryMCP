@@ -48,7 +48,7 @@ socket.on("data", (c) => {
   }
 });
 
-send({ type: "hello", modVersion: "0.3.1", gameVersion: "1.3.1" });
+send({ type: "hello", modVersion: "0.4.1", gameVersion: "1.3.1" });
 
 // Snapshot 1: player at 50hp (below the 90 threshold) + one void corpse
 send({
@@ -63,56 +63,50 @@ send({
 
 await new Promise((r) => setTimeout(r, 2000));
 
-const potions = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth");
-check("low health rule spawned a potion", potions.length >= 1);
-const lowHealthMessages = commands.filter((c) => c.op === "show_message" && /potion/i.test(c.params.text ?? ""));
-check("low health rule displayed an in-game message", lowHealthMessages.length >= 1);
+const hurtMessages = commands.filter((c) => c.op === "show_message" && /hurt/i.test(c.params.text ?? ""));
+check("low health flags a pity potion (message, no feet spawn)", hurtMessages.length >= 1);
+const feetPotions = commands.filter(
+  (c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth" && c.params.relativeToPlayer !== undefined,
+);
+check("no potion spawned at the player's feet", feetPotions.length === 0);
 const cleanups = commands.filter((c) => c.op === "despawn_entity" && c.params.instanceId === 999);
 check("void corpse cleaned up", cleanups.length >= 1);
 
-// Wave: 2 enemies alive -> kill event -> 0 enemies -> settle -> reward
-send({
-  type: "snapshot", seq: 2, gameTime: 2,
-  level: { id: "Arena", mode: "Sandbox" },
-  player: { present: true, pos: [0, 0, 0], health: 100 },
-  creatures: [
-    { instanceId: 1, type: "HumanMale", state: "Alive", health: 100, faction: 2, isPlayer: true, pos: [0, 0, 0], dist: 0 },
-    { instanceId: 2, type: "HumanMale", state: "Alive", health: 50, faction: 3, isPlayer: false, pos: [2, 0, 2], dist: 2.8 },
-    { instanceId: 3, type: "HumanFemale", state: "Alive", health: 50, faction: 3, isPlayer: false, pos: [-2, 0, 2], dist: 2.8 },
-  ],
-});
-send({ type: "event", name: "creature_kill", data: { instanceId: 2, type: "HumanMale" } });
-send({ type: "event", name: "creature_kill", data: { instanceId: 3, type: "HumanFemale" } });
-send({
-  type: "snapshot", seq: 3, gameTime: 3,
-  level: { id: "Arena", mode: "Sandbox" },
-  player: { present: true, pos: [0, 0, 0], health: 100 },
-  creatures: [
-    { instanceId: 1, type: "HumanMale", state: "Alive", health: 100, faction: 2, isPlayer: true, pos: [0, 0, 0], dist: 0 },
-  ],
-});
+// Kill 1 at [1,0,1]: pity potion drops at the corpse
+send({ type: "event", name: "creature_kill", data: { instanceId: 500, type: "HumanMale", pos: [1, 0, 1] } });
+await new Promise((r) => setTimeout(r, 800));
+const pityDrop = commands.filter(
+  (c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth" && Array.isArray(c.params.position),
+);
+check(
+  "pity potion dropped at the corpse position",
+  pityDrop.length >= 1 && Math.abs(pityDrop[0].params.position[1] - 0.3) < 0.001,
+);
 
-await new Promise((r) => setTimeout(r, 2500));
-
-const totalPotions = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth");
-check("wave end reward spawned (second potion)", totalPotions.length >= 2);
+// Kill 2 at [2,0,2]: loot roll (chance 1.0, table = Poo) drops Poo + message
+send({ type: "event", name: "creature_kill", data: { instanceId: 501, type: "HumanMale", pos: [2, 0, 2] } });
+await new Promise((r) => setTimeout(r, 800));
+const pooDrops = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "Poo");
+check("loot dropped at the corpse", pooDrops.length >= 1 && Array.isArray(pooDrops[0].params.position));
+const pooMessages = commands.filter((c) => c.op === "show_message" && /smell/i.test(c.params.text ?? ""));
+check("poo drop announced", pooMessages.length >= 1);
 
 // Shop is a safe zone: low health must NOT trigger anything
 const commandsBeforeShop = commands.length;
 send({
-  type: "snapshot", seq: 4, gameTime: 4,
+  type: "snapshot", seq: 2, gameTime: 2,
   level: { id: "Shop", mode: "Sandbox" },
   player: { present: true, pos: [0, 0, 0], health: 40 },
   creatures: [{ instanceId: 1, type: "HumanMale", state: "Alive", health: 40, faction: 2, isPlayer: true, pos: [0, 0, 0], dist: 0 }],
 });
 await new Promise((r) => setTimeout(r, 1500));
-const shopActions = commands.slice(commandsBeforeShop).filter((c) => c.op === "spawn_item");
-check("shop safe zone: no potion spawned", shopActions.length === 0);
+const shopActions = commands.slice(commandsBeforeShop).filter((c) => c.op === "spawn_item" || c.op === "show_message");
+check("shop safe zone: nothing spawned or announced", shopActions.length === 0);
 
-// Home: burglars sneak in at the entrance points after the cooldown
+// Home: burglars sneak in from far away and hunt the player
 const commandsBeforeHome = commands.length;
 send({
-  type: "snapshot", seq: 5, gameTime: 5,
+  type: "snapshot", seq: 3, gameTime: 3,
   level: { id: "Home", mode: "Sandbox" },
   player: { present: true, pos: [37.7, 1.87, -46.4], health: 100 },
   creatures: [{ instanceId: 1, type: "HumanMale", state: "Alive", health: 100, faction: 2, isPlayer: true, pos: [37.7, 1.87, -46.4], dist: 0 }],

@@ -3,11 +3,23 @@
   "cleanupVoidCorpses": true,
   "waveSettleMs": 10000,
   "lowHealthPotion": { "enabled": true, "threshold": 60, "cooldownMs": 120000 },
-  "waveEndReward": {
+  "lootDrops": {
     "enabled": true,
-    "minSessionKills": 5,
-    "cooldownMs": 300000,
-    "items": ["PotionHealth", "SwordLongCommon", "AxeShortWar", "ThrowablesDagger"]
+    "chance": 0.3,
+    "items": [
+      { "id": "PotionHealth", "weight": 5 },
+      { "id": "SpellBombFire", "weight": 3 },
+      { "id": "SpellBombGravity", "weight": 3 },
+      { "id": "SpellBombLightning", "weight": 3 },
+      { "id": "PotionRumFire", "weight": 3 },
+      { "id": "PotionRumGravity", "weight": 3 },
+      { "id": "PotionRumLightning", "weight": 3 },
+      { "id": "CoinBag", "weight": 4 },
+      { "id": "GoldCoin", "weight": 6 },
+      { "id": "SilverCoin", "weight": 6 },
+      { "id": "CopperCoin", "weight": 8 },
+      { "id": "Poo", "weight": 2 }
+    ]
   },
   "killStreakLog": { "enabled": true, "kills": 3, "windowMs": 10000 },
   "levelRules": {
