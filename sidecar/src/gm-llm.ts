@@ -31,7 +31,7 @@ export const defaultLlmConfig: LlmConfig = {
   baseUrl: "https://openrouter.ai/api/v1",
   model: "deepseek/deepseek-chat",
   minIntervalMs: 60000,
-  triggers: ["waveEnd", "killStreak", "lowHealth"],
+  triggers: ["waveEnd", "killStreak", "burglar"],
   timeoutMs: 30000,
   maxActions: 3,
 };
@@ -84,7 +84,7 @@ function buildSystemPrompt(world: LlmWorld, config: LlmConfig): string {
     "Rules:",
     "- At most 3 actions. At most 3 new enemies per reaction.",
     "- NEVER despawn the player. The player's instanceId is in the state below.",
-    "- If the player is hurt, help. If the player is crushing everything, escalate gently.",
+    "- If the player is crushing everything, escalate gently. NEVER hand out free health potions - enemy loot drops are the only potion source and resource scarcity is part of the challenge.",
     "- Never spawn anything within 5 metres of the player. Prefer known spawn points or map edges so enemies approach naturally.",
     "- If nothing is worth doing, return an empty actions array.",
     "",

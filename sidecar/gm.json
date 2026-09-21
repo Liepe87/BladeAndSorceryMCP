@@ -2,7 +2,6 @@
   "enabled": true,
   "cleanupVoidCorpses": true,
   "waveSettleMs": 10000,
-  "lowHealthPotion": { "enabled": true, "threshold": 60, "cooldownMs": 120000 },
   "lootDrops": {
     "enabled": true,
     "chance": 0.3,
@@ -46,7 +45,7 @@
     "baseUrl": "https://openrouter.ai/api/v1",
     "model": "deepseek/deepseek-chat",
     "minIntervalMs": 180000,
-    "triggers": ["waveEnd", "killStreak", "lowHealth", "burglar"],
+    "triggers": ["waveEnd", "killStreak", "burglar"],
     "timeoutMs": 30000,
     "maxActions": 3
   }

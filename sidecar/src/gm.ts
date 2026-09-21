@@ -6,7 +6,6 @@ export interface GmConfig {
   enabled: boolean;
   cleanupVoidCorpses: boolean;
   waveSettleMs: number;
-  lowHealthPotion: { enabled: boolean; threshold: number; cooldownMs: number };
   lootDrops: {
     enabled: boolean;
     chance: number;
@@ -21,7 +20,6 @@ export const defaultGmConfig: GmConfig = {
   enabled: true,
   cleanupVoidCorpses: true,
   waveSettleMs: 10000,
-  lowHealthPotion: { enabled: true, threshold: 60, cooldownMs: 120000 },
   lootDrops: {
     enabled: true,
     chance: 0.3,
@@ -70,7 +68,6 @@ export class GameMaster {
   private currentLevel: string | null = null;
   private killsAtLastWaveEnd = 0;
   private lastBurglarAt = Date.now(); // grace period: no rolls right after startup
-  private pityPotion = false; // set when the player is hurt: next kill drops a potion
 
   constructor(
     private bridge: TcpBridge,
@@ -117,20 +114,8 @@ export class GameMaster {
       }
     }
 
-    // Low health: flag a pity potion for the next kill instead of spawning
-    // items at the player's feet.
-    const potion = this.config.lowHealthPotion;
-    if (
-      potion.enabled &&
-      this.playerHealth > 0 &&
-      this.playerHealth < potion.threshold
-    ) {
-      this.gate("lowHealthPotion", potion.cooldownMs, () => {
-        this.pityPotion = true;
-        this.announce("You're badly hurt - your next kill may yield a potion.", 5);
-        void this.llm?.react("lowHealth");
-      });
-    }
+    // Low health gets no special treatment - loot drops are the only potion
+    // source. The challenge is the point.
 
     // Wave transition bookkeeping: when enemies drop from >0 to 0, arm the
     // settle timer. Settling itself happens in tick() so it works even if
@@ -184,10 +169,7 @@ export class GameMaster {
     if (!cfg?.enabled || !killPos || killPos.length !== 3) return;
 
     let itemId: string | null = null;
-    if (this.pityPotion) {
-      itemId = "PotionHealth";
-      this.pityPotion = false;
-    } else if (Math.random() < cfg.chance) {
+    if (Math.random() < cfg.chance) {
       itemId = this.pickWeighted(cfg.items);
     }
     if (!itemId) return;

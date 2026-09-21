@@ -63,31 +63,27 @@ send({
 
 await new Promise((r) => setTimeout(r, 2000));
 
-const hurtMessages = commands.filter((c) => c.op === "show_message" && /hurt/i.test(c.params.text ?? ""));
-check("low health flags a pity potion (message, no feet spawn)", hurtMessages.length >= 1);
-const feetPotions = commands.filter(
-  (c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth" && c.params.relativeToPlayer !== undefined,
-);
-check("no potion spawned at the player's feet", feetPotions.length === 0);
+const earlyActions = commands.filter((c) => c.op === "spawn_item" || c.op === "show_message");
+check("low health triggers nothing (no potions, no messages)", earlyActions.length === 0);
 const cleanups = commands.filter((c) => c.op === "despawn_entity" && c.params.instanceId === 999);
 check("void corpse cleaned up", cleanups.length >= 1);
 
-// Kill 1 at [1,0,1]: pity potion drops at the corpse
+// Kill 1 at [1,0,1]: loot roll (chance 1.0, table = Poo) drops Poo
 send({ type: "event", name: "creature_kill", data: { instanceId: 500, type: "HumanMale", pos: [1, 0, 1] } });
 await new Promise((r) => setTimeout(r, 800));
-const pityDrop = commands.filter(
-  (c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth" && Array.isArray(c.params.position),
+const pooDrop1 = commands.filter(
+  (c) => c.op === "spawn_item" && c.params.itemId === "Poo" && Array.isArray(c.params.position),
 );
 check(
-  "pity potion dropped at the corpse position",
-  pityDrop.length >= 1 && Math.abs(pityDrop[0].params.position[1] - 0.3) < 0.001,
+  "kill dropped loot at the corpse position",
+  pooDrop1.length >= 1 && Math.abs(pooDrop1[0].params.position[1] - 0.3) < 0.001,
 );
 
-// Kill 2 at [2,0,2]: loot roll (chance 1.0, table = Poo) drops Poo + message
+// Kill 2 at [2,0,2]: another loot drop
 send({ type: "event", name: "creature_kill", data: { instanceId: 501, type: "HumanMale", pos: [2, 0, 2] } });
 await new Promise((r) => setTimeout(r, 800));
 const pooDrops = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "Poo");
-check("loot dropped at the corpse", pooDrops.length >= 1 && Array.isArray(pooDrops[0].params.position));
+check("second kill also dropped loot", pooDrops.length >= 2);
 const pooMessages = commands.filter((c) => c.op === "show_message" && /smell/i.test(c.params.text ?? ""));
 check("poo drop announced", pooMessages.length >= 1);
 
