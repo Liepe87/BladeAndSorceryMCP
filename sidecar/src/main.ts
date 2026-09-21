@@ -62,6 +62,8 @@ function loadGmConfig(): GmConfig {
   try {
     const raw = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
     const llm = { ...defaultLlmConfig, ...((raw as { llm?: object }).llm ?? {}) };
+    // .env / environment overrides the file config
+    if (process.env.BASMCP_LLM_MODEL) llm.model = process.env.BASMCP_LLM_MODEL;
     return { ...defaultGmConfig, ...(raw as Partial<GmConfig>), llm };
   } catch (e) {
     log(`GM config load failed (${(e as Error).message}) - using defaults`);
