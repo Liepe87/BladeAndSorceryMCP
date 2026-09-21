@@ -1,4 +1,4 @@
-// gm-llm-test.mjs — unit tests the LlmReactor with a mocked fetch (no API key).
+﻿// gm-llm-test.mjs â€” unit tests the LlmReactor with a mocked fetch (no API key).
 import { LlmReactor } from "../dist/gm-llm.js";
 
 let failures = 0;
@@ -53,6 +53,10 @@ let reactor = new LlmReactor(
 );
 await reactor.react("waveEnd");
 check("valid spawn action executed", commands.some((c) => c.op === "spawn_creature" && c.params.creatureId === "HumanMale" && c.params.brainId === "HumanHard"));
+check(
+  "LLM comment displayed as in-game message",
+  commands.some((c) => c.op === "show_message" && c.params.text === "Reinforcements arrive!"),
+);
 
 // 2: player despawn refused
 commands.length = 0;
@@ -70,7 +74,7 @@ reactor = new LlmReactor(
   fakeFetchFor('{"comment":"x","actions":[{"tool":"nuke_the_world","args":{}}]}'),
 );
 await reactor.react("waveEnd");
-check("unknown tool skipped without crashing", commands.length === 0);
+check("unknown tool skipped without crashing", commands.filter((c) => c.op !== "show_message").length === 0);
 
 // 4: code-fenced JSON with prose still parses
 commands.length = 0;
@@ -88,7 +92,7 @@ reactor = new LlmReactor(
   fakeFetchFor('{"comment":"x","actions":[{"tool":"spawn_creature","args":{"creatureId":"Dragon"}}]}'),
 );
 await reactor.react("waveEnd");
-check("non-curated creature rejected", commands.length === 0);
+check("non-curated creature rejected", commands.filter((c) => c.op !== "show_message").length === 0);
 
 // 6: non-trigger ignored, API error logged without crashing
 commands.length = 0;
@@ -142,7 +146,8 @@ reactor = new LlmReactor(
   fakeFetchFor('{"comment":"x","actions":[{"tool":"spawn_creature","args":{"creatureId":"HumanMale","distanceFromPlayer":999}}]}'),
 );
 await reactor.react("waveEnd");
-check("out-of-range distance rejected", commands.length === 0);
+check("out-of-range distance rejected", commands.filter((c) => c.op !== "show_message").length === 0);
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
+

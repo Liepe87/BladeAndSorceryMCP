@@ -174,7 +174,13 @@ export class LlmReactor {
       const content = data.choices?.[0]?.message?.content ?? "";
       const parsed = parseLlmJson(content);
 
-      if (parsed.comment) this.log(`[gm-llm] ${trigger}: ${parsed.comment}`);
+      if (parsed.comment) {
+        this.log(`[gm-llm] ${trigger}: ${parsed.comment}`);
+        // Show the dungeon master's narration in-game too.
+        void this.channel
+          .send("show_message", { text: parsed.comment, duration: 6 })
+          .catch(() => undefined);
+      }
       for (const action of parsed.actions.slice(0, this.config.maxActions)) {
         await this.execute(action);
       }

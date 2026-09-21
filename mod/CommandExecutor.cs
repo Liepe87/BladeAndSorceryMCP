@@ -39,6 +39,9 @@ namespace BaSMcpBridge
                     case "despawn_entity":
                         result = DespawnEntity(command.payload);
                         break;
+                    case "show_message":
+                        result = ShowMessage(command.payload);
+                        break;
                     default:
                         ok = false;
                         error = "unknown op: " + command.op;
@@ -159,6 +162,32 @@ namespace BaSMcpBridge
                 { "attackPlayer", attackPlayer },
                 { "position", StatePublisher.Vec(pos) }
             };
+        }
+
+        private static JObject ShowMessage(JObject p)
+        {
+            string text = (string)p?["text"];
+            if (string.IsNullOrEmpty(text))
+            {
+                throw new Exception("text is required");
+            }
+            float duration = p?["duration"] != null ? (float)p["duration"] : 5f;
+
+            DisplayMessage display = DisplayMessage.instance;
+            if (display == null)
+            {
+                Debug.Log("[BaSMcp] show_message: DisplayMessage not available yet");
+                return new JObject { { "shown", false } };
+            }
+
+            // Low priority (tutorials preempt), no warning sound, floats in
+            // front of the head, auto-dismisses.
+            var messageData = new DisplayMessage.MessageData(
+                text, 1, 0f, null, null, false, true, false, false,
+                MessageAnchorType.Head, null, true, duration, null, true, null);
+
+            display.ShowMessage(messageData);
+            return new JObject { { "shown", true }, { "text", text } };
         }
 
         // Finds a walkable point on the navmesh at roughly the given distance

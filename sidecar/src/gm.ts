@@ -111,7 +111,7 @@ export class GameMaster {
       this.playerHealth < potion.threshold
     ) {
       this.gate("lowHealthPotion", potion.cooldownMs, () => {
-        this.log(`[gm] player at ${Math.round(this.playerHealth)} hp - dropping a potion`);
+        this.announce("A potion appears at your feet.", 4);
         void this.bridge
           .send("spawn_item", { itemId: "PotionHealth", relativeToPlayer: [1, 0.2, 1] })
           .catch(() => undefined);
@@ -142,9 +142,7 @@ export class GameMaster {
     if (this.sessionKills <= this.killsAtLastWaveEnd) return;
     this.killsAtLastWaveEnd = this.sessionKills;
 
-    this.log(
-      `[gm] wave settled - session kills: ${this.sessionKills}, player health: ${Math.round(this.playerHealth)}`,
-    );
+    this.announce(`Wave cleared - ${this.sessionKills} kills this session.`, 6);
     void this.llm?.react("waveEnd");
     const reward = this.config.waveEndReward;
     if (reward.enabled && this.sessionKills >= reward.minSessionKills) {
@@ -168,7 +166,7 @@ export class GameMaster {
     this.killTimes.push(now);
     this.killTimes = this.killTimes.filter((t) => now - t <= streak.windowMs);
     if (this.killTimes.length >= streak.kills) {
-      this.log(`[gm] kill streak: ${this.killTimes.length} kills in ${streak.windowMs / 1000}s`);
+      this.announce(`Kill streak: ${this.killTimes.length} kills in ${streak.windowMs / 1000}s!`, 4);
       this.killTimes = []; // reset so the next streak needs fresh kills
       void this.llm?.react("killStreak");
     }
@@ -226,6 +224,12 @@ export class GameMaster {
     return this.config.levelRules?.[this.currentLevel];
   }
 
+  // Logs to the console/log file AND displays the message in-game.
+  private announce(text: string, duration = 5): void {
+    this.log(`[gm] ${text}`);
+    void this.bridge.send("show_message", { text, duration }).catch(() => undefined);
+  }
+
   private spawnBurglars(burglar: NonNullable<LevelRule["burglar"]>): void {
     const count = 1 + Math.floor(Math.random() * Math.max(1, burglar.maxEnemies));
     const brains = ["HumanEasy", "HumanMedium"];
@@ -233,7 +237,7 @@ export class GameMaster {
     const min = burglar.distanceMin ?? 25;
     const max = burglar.distanceMax ?? 45;
 
-    this.log(`[gm] ${count} burglar(s) approaching from outside...`);
+    this.announce(`You hear a door creak somewhere in the house... (${count} burglar${count > 1 ? "s" : ""})`, 5);
     for (let i = 0; i < count; i++) {
       const params = {
         creatureId: types[Math.floor(Math.random() * types.length)],

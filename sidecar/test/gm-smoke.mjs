@@ -41,6 +41,8 @@ socket.on("data", (c) => {
       commands.push({ op: msg.op, params: msg.params ?? {} });
       if (msg.op === "spawn_item") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, itemId: msg.params.itemId } });
       else if (msg.op === "despawn_entity") send({ type: "reply", id: msg.id, ok: true, result: { despawned: true, kind: "creature" } });
+      else if (msg.op === "spawn_creature") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, creatureId: msg.params.creatureId } });
+      else if (msg.op === "show_message") send({ type: "reply", id: msg.id, ok: true, result: { shown: true } });
       else send({ type: "reply", id: msg.id, ok: true, result: {} });
     }
   }
@@ -63,6 +65,8 @@ await new Promise((r) => setTimeout(r, 2000));
 
 const potions = commands.filter((c) => c.op === "spawn_item" && c.params.itemId === "PotionHealth");
 check("low health rule spawned a potion", potions.length >= 1);
+const lowHealthMessages = commands.filter((c) => c.op === "show_message" && /potion/i.test(c.params.text ?? ""));
+check("low health rule displayed an in-game message", lowHealthMessages.length >= 1);
 const cleanups = commands.filter((c) => c.op === "despawn_entity" && c.params.instanceId === 999);
 check("void corpse cleaned up", cleanups.length >= 1);
 
@@ -122,6 +126,8 @@ check(
       (c) => typeof c.params.distanceFromPlayer === "number" && c.params.attackPlayer === true,
     ),
 );
+const burglarMessages = commands.slice(commandsBeforeHome).filter((c) => c.op === "show_message" && /door/i.test(c.params.text ?? ""));
+check("burglar event displayed an in-game message", burglarMessages.length >= 1);
 
 socket.end();
 child.kill();

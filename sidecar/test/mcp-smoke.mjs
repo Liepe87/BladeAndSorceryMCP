@@ -58,6 +58,7 @@ socket.on("data", (c) => {
       else if (msg.op === "spawn_creature") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, creatureId: msg.params.creatureId, position: msg.params.position ?? [] } });
       else if (msg.op === "spawn_item") send({ type: "reply", id: msg.id, ok: true, result: { accepted: true, itemId: msg.params.itemId } });
       else if (msg.op === "despawn_entity") send({ type: "reply", id: msg.id, ok: true, result: { despawned: true, kind: "creature" } });
+      else if (msg.op === "show_message") send({ type: "reply", id: msg.id, ok: true, result: { shown: true } });
       else send({ type: "reply", id: msg.id, ok: false, error: "unknown op" });
     }
   }
@@ -68,7 +69,7 @@ await new Promise((r) => setTimeout(r, 1500));
 // --- MCP tool calls ---
 const tools = await client.listTools();
 console.log("\nTOOLS:", tools.tools.map((t) => t.name).join(", "));
-check("six tools exposed", tools.tools.length === 6);
+check("seven tools exposed", tools.tools.length === 7);
 
 const state = await client.callTool({ name: "get_game_state", arguments: {} });
 const stateObj = JSON.parse(state.content[0].text);
@@ -105,4 +106,5 @@ socket.end();
 await client.close();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
+
 

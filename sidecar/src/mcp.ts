@@ -154,5 +154,24 @@ export function createMcpServer(bridge: TcpBridge, guards: Guards): McpServer {
     },
   );
 
+  server.tool(
+    "show_message",
+    "Display a message to the player in-game (floats in front of the head for a few seconds).",
+    {
+      text: z.string().describe("Message text shown to the player"),
+      duration: z.number().optional().describe("Seconds to display (default 5)"),
+    },
+    async (args) => {
+      const params: Record<string, unknown> = { text: args.text };
+      if (args.duration !== undefined) params.duration = args.duration;
+      try {
+        const result = await bridge.send("show_message", params);
+        return text({ ok: true, result });
+      } catch (e) {
+        return text({ ok: false, error: (e as Error).message });
+      }
+    },
+  );
+
   return server;
 }
