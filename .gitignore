@@ -12,6 +12,8 @@ sidecar/node_modules/
 # Runtime logs
 listener.log
 *.log
+sidecar/sidecar.log
+sidecar/sidecar.log.old
 
 # Secrets
 .env

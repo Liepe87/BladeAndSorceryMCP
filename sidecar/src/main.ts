@@ -1,5 +1,11 @@
 import http from "node:http";
-import { readFileSync } from "node:fs";
+import {
+  appendFileSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
@@ -12,9 +18,34 @@ import { GameMaster, defaultGmConfig } from "./gm.js";
 import type { GmConfig } from "./gm.js";
 import { LlmReactor, defaultLlmConfig } from "./gm-llm.js";
 
-// Logs go to stderr so stdout stays clean for the MCP stdio transport.
-const log = (msg: string): void =>
-  console.error(`[bas-mcp] ${new Date().toISOString()} ${msg}`);
+const sidecarDir = dirname(fileURLToPath(import.meta.url));
+const sidecarLogPath = join(sidecarDir, "..", "sidecar.log");
+
+// Rotate the session log if it has grown past 5MB.
+try {
+  if (statSync(sidecarLogPath).size > 5 * 1024 * 1024) {
+    try {
+      unlinkSync(sidecarLogPath + ".old");
+    } catch {
+      // no previous .old
+    }
+    renameSync(sidecarLogPath, sidecarLogPath + ".old");
+  }
+} catch {
+  // no log file yet
+}
+
+// Logs go to stderr (keeps stdout clean for the MCP stdio transport) and are
+// also appended to sidecar.log so sessions can be reviewed afterwards.
+const log = (msg: string): void => {
+  const line = `[bas-mcp] ${new Date().toISOString()} ${msg}`;
+  console.error(line);
+  try {
+    appendFileSync(sidecarLogPath, line + "\n", "utf8");
+  } catch {
+    // log file unavailable - console only
+  }
+};
 
 // Load sidecar/.env if present (never overrides existing environment vars).
 function loadDotEnv(): void {
