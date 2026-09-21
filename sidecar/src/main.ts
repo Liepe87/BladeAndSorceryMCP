@@ -17,7 +17,6 @@ const bridge = new TcpBridge(tcpPort, log);
 bridge.start();
 
 const guards = {
-  allowlist: loadAllowlist(),
   limiter: new SpawnLimiter(
     Number(process.env.BASMCP_SPAWN_PER_MIN ?? 30),
     Number(process.env.BASMCP_SPAWN_INTERVAL_MS ?? 500),

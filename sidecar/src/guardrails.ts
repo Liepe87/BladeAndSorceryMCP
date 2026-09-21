@@ -9,6 +9,8 @@ export interface Allowlist {
 
 // Loads the catalog allowlist (generated from the game's bas.jsondb).
 // Override the path with BASMCP_ALLOWLIST (used by tests).
+// Read on every call: spawns are rate-limited, so a fresh read is cheap and
+// means allowlist edits never require a sidecar restart.
 export function loadAllowlist(): Allowlist {
   const defaultPath = join(dirname(fileURLToPath(import.meta.url)), "..", "catalog", "allowlist.json");
   const path = process.env.BASMCP_ALLOWLIST ?? defaultPath;

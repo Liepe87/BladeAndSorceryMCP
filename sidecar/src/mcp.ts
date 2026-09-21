@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TcpBridge } from "./tcp-bridge.js";
-import type { Allowlist, SpawnLimiter } from "./guardrails.js";
+import { loadAllowlist } from "./guardrails.js";
+import type { SpawnLimiter } from "./guardrails.js";
 
 export interface Guards {
-  allowlist: Allowlist;
   limiter: SpawnLimiter;
   maxCreatures: number;
 }
@@ -62,8 +62,9 @@ export function createMcpServer(bridge: TcpBridge, guards: Guards): McpServer {
       brainId: z.string().optional().describe("Brain ID, e.g. Brain_HumanEasy (defaults to HumanDummy)"),
     },
     async (args) => {
-      if (!guards.allowlist.creatures.includes(args.creatureId)) {
-        return text({ ok: false, error: `creatureId '${args.creatureId}' is not in the allowlist (${guards.allowlist.creatures.length} known creatures)` });
+      const allowlist = loadAllowlist();
+      if (!allowlist.creatures.includes(args.creatureId)) {
+        return text({ ok: false, error: `creatureId '${args.creatureId}' is not in the allowlist (${allowlist.creatures.length} known creatures)` });
       }
       if (bridge.world.aliveCount() >= guards.maxCreatures) {
         return text({ ok: false, error: `creature cap reached (${guards.maxCreatures} alive)` });
@@ -107,8 +108,9 @@ export function createMcpServer(bridge: TcpBridge, guards: Guards): McpServer {
       owned: z.boolean().optional().describe("Set the player as owner (item goes to inventory-worthy state)"),
     },
     async (args) => {
-      if (!guards.allowlist.items.includes(args.itemId)) {
-        return text({ ok: false, error: `itemId '${args.itemId}' is not in the allowlist (${guards.allowlist.items.length} known items)` });
+      const allowlist = loadAllowlist();
+      if (!allowlist.items.includes(args.itemId)) {
+        return text({ ok: false, error: `itemId '${args.itemId}' is not in the allowlist (${allowlist.items.length} known items)` });
       }
       const limitError = guards.limiter.trySpawn();
       if (limitError) {

@@ -1,4 +1,4 @@
-// mcp-smoke.mjs — end-to-end M1 test without the game.
+﻿// mcp-smoke.mjs â€” end-to-end M1 test without the game.
 // Spawns the sidecar over MCP stdio, connects to its TCP bridge as a fake game,
 // feeds hello + snapshot + event, answers its commands, then calls the MCP tools.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -85,11 +85,11 @@ const ping = await client.callTool({ name: "ping", arguments: {} });
 const pingObj = JSON.parse(ping.content[0].text);
 check("ping reaches fake game and gets pong", pingObj.pong === true && pingObj.gamePing?.pong === true);
 
-const spawnC = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "Creature_HumanMale", relativeToPlayer: [2, 0, 2] } });
+const spawnC = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "HumanMale", relativeToPlayer: [2, 0, 2] } });
 const spawnCObj = JSON.parse(spawnC.content[0].text);
 check("spawn_creature accepted", spawnCObj.ok === true && spawnCObj.result?.accepted === true);
 
-const spawnI = await client.callTool({ name: "spawn_item", arguments: { itemId: "Item_Weapon_SwordLongCommon" } });
+const spawnI = await client.callTool({ name: "spawn_item", arguments: { itemId: "SwordLongCommon" } });
 const spawnIObj = JSON.parse(spawnI.content[0].text);
 check("spawn_item accepted", spawnIObj.ok === true && spawnIObj.result?.accepted === true);
 
@@ -97,7 +97,7 @@ const despawn = await client.callTool({ name: "despawn_entity", arguments: { ins
 const despawnObj = JSON.parse(despawn.content[0].text);
 check("despawn_entity accepted", despawnObj.ok === true && despawnObj.result?.despawned === true);
 
-const badSpawn = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "Creature_Dragon" } });
+const badSpawn = await client.callTool({ name: "spawn_creature", arguments: { creatureId: "Dragon" } });
 const badSpawnObj = JSON.parse(badSpawn.content[0].text);
 check("allowlist rejects unknown creature", badSpawnObj.ok === false && /allowlist/.test(badSpawnObj.error ?? ""));
 
@@ -105,3 +105,4 @@ socket.end();
 await client.close();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
+
